@@ -15,6 +15,8 @@ export default function DailySelectPage() {
     // Master Team State
     const [allTechnicians, setAllTechnicians] = useState<any[]>([])
     const [masterTeamIds, setMasterTeamIds] = useState<string[]>([])
+    // TODO: Replace with dynamic job selection UI
+    const [activeJobId] = useState<string>("")
 
     // Daily Schedule State
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0])
@@ -36,7 +38,7 @@ export default function DailySelectPage() {
                 // Load all techs and current master team
                 const [allRes, masterRes] = await Promise.all([
                     api.getTechnicians(),
-                    api.getMasterTeam()
+                    api.getMasterTeam(activeJobId)
                 ])
                 if (allRes.technicians) {
                     // Filter valid techs
@@ -48,7 +50,7 @@ export default function DailySelectPage() {
                 }
             } else {
                 // Load Master Team for Daily Select
-                const res = await api.getMasterTeam()
+                const res = await api.getMasterTeam(activeJobId)
                 if (res.members) {
                     setMasterTeamMembers(res.members)
                 }
@@ -70,7 +72,7 @@ export default function DailySelectPage() {
     const saveMasterTeam = async () => {
         setIsProcessing(true)
         try {
-            await api.updateMasterTeam(masterTeamIds)
+            await api.updateMasterTeam(activeJobId, masterTeamIds)
             toast.success("Master Team updated successfully")
         } catch (e) {
             toast.error("Failed to update Master Team")
@@ -319,9 +321,6 @@ export default function DailySelectPage() {
                                             <p className={`font-bold text-lg leading-tight transition-colors ${isSelected ? "text-primary" : ""}`}>
                                                 {tech.name}
                                             </p>
-                                            <span className="flex items-center gap-1 text-xs font-bold text-yellow-500">
-                                                ★ {tech.rating > 0 ? Number(tech.rating).toFixed(1) : 'N/A'}
-                                            </span>
                                         </div>
                                         <div className="flex items-center gap-2 mt-0.5">
                                             <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{tech.skill}</p>

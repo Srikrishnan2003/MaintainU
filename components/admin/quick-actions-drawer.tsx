@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { Briefcase, Users, UserPlus, Map, Calendar, DollarSign, LayoutGrid } from "lucide-react"
+import { Briefcase, Users, UserPlus, Map, Calendar, DollarSign, LayoutGrid, Settings } from "lucide-react"
 import {
     Drawer,
     DrawerContent,
@@ -14,10 +14,9 @@ import { cn } from "@/lib/utils"
 const quickActions = [
     { icon: Briefcase, label: "View Requests", path: "/admin/requests", color: "text-purple-500" },
     { icon: Users, label: "Technicians", path: "/admin/technicians", color: "text-indigo-500" },
-    { icon: UserPlus, label: "Onboarding", path: "/admin/onboarding", color: "text-blue-500" },
-    { icon: Map, label: "Live Map", path: "/admin/location", color: "text-orange-500" },
-    { icon: Calendar, label: "Daily Select", path: "/admin/daily-select", color: "text-pink-500" },
-    { icon: DollarSign, label: "Salary", path: "/admin/salary", color: "text-emerald-500" },
+    { icon: UserPlus, label: "User Management", path: "/admin/onboarding", color: "text-blue-500" },
+    { icon: Calendar, label: "Job Calendar", path: "/admin/calendar", color: "text-red-500" },
+    { icon: Settings, label: "Settings", path: "/admin/settings", color: "text-slate-500" },
 ]
 
 interface QuickActionsDrawerProps {

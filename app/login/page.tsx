@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2, Clock, ShieldCheck, Home, Lock, Eye, EyeOff, Phone, ArrowRight, CheckCircle2, Building2, Wrench, LayoutDashboard } from "lucide-react"
+import { Loader2, Clock, ShieldCheck, Home, Lock, Phone, ArrowRight, CheckCircle2, Building2, Wrench } from "lucide-react"
 import { api } from "@/lib/api"
-import { requestPasswordResetAction, checkResetStatusAction, completePasswordResetAction } from "@/lib/actions"
 import { toast } from "sonner"
+import { useSSE } from "@/hooks/use-sse"
+import { Logo } from "@/components/ui/logo"
 
-type Step = "login" | "verify-required" | "waiting" | "approved"
+type Step = "login" | "verify-required" | "waiting" | "approved" | "otp-entry"
 
 function LoginContent() {
   const router = useRouter()
@@ -17,12 +18,13 @@ function LoginContent() {
 
   const [phone, setPhone] = useState(initialPhone)
   const [role, setRole] = useState<"company" | "technician" | "admin">("company")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
   const [step, setStep] = useState<Step>("login")
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
+  const [otpInput, setOtpInput] = useState<string[]>(["", "", "", "", "", ""])
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
+
+  const { accountApproved, fallbackMode } = useSSE(step === "waiting")
 
   // OTP Animation State
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""])
@@ -37,15 +39,23 @@ function LoginContent() {
     }
   }, [])
 
-  // Start polling for admin approval when in waiting state
+  // Handle SSE Approval
   useEffect(() => {
-    if (step !== "waiting") return
+    if (step === "waiting" && accountApproved) {
+      toast.success("Account approved!")
+      setStep("approved")
+    }
+  }, [step, accountApproved])
+
+  // Fallback Polling
+  useEffect(() => {
+    if (step !== "waiting" || !fallbackMode) return
 
     const pollForApproval = async () => {
       try {
         if (step === "waiting") {
           const res = await api.refreshSession()
-          if (res.success && res.status === 'active') {
+          if (res.success && (res.status === 'ACTIVE')) {
             if (pollingRef.current) clearInterval(pollingRef.current)
             pollingRef.current = null
             toast.success("Account approved!")
@@ -57,10 +67,8 @@ function LoginContent() {
       }
     }
 
-    // Start polling every 3 seconds
     if (pollingRef.current) clearInterval(pollingRef.current)
-    pollingRef.current = setInterval(pollForApproval, 3000)
-    // Also poll immediately
+    pollingRef.current = setInterval(pollForApproval, 30000)
     pollForApproval()
 
     return () => {
@@ -69,7 +77,7 @@ function LoginContent() {
         pollingRef.current = null
       }
     }
-  }, [step, router])
+  }, [step, fallbackMode])
 
   // OTP Animation effect when approved
   useEffect(() => {
@@ -90,16 +98,16 @@ function LoginContent() {
         index++
         setTimeout(animateOtp, 300)
       } else {
-        // Animation complete, wait a moment then redirect
+        // Animation complete, redirect to dashboard
         setTimeout(() => {
-          router.push("/setup-password")
+          router.push(role === 'technician' ? "/technician/dashboard" : "/company/dashboard")
         }, 800)
       }
     }
 
     // Start animation after a brief delay
     setTimeout(animateOtp, 500)
-  }, [step, router])
+  }, [step, router, role])
 
   const handleLogin = async () => {
     if (phone.length !== 10) {
@@ -108,97 +116,61 @@ function LoginContent() {
     }
     setErrorMessage("")
 
-    if (!password) {
-      toast.error("Please enter your password")
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      // Pass selected role to sync intent if pending
-      // If role is 'admin', we don't pass it as inputRole to avoid confusion, or map it safely on server?
-      // Server expects "company" | "technician". 
-      const inputRole = role === 'admin' ? undefined : role
-      const res = await api.loginWithPassword(phone, password, inputRole)
-
-      if (res.success) {
-        // Automatic Role Redirection
-        // We trust the backend response (safe-guarded by password) to determine where the user goes.
-        // The 'role' state from tabs is just a preference/UI state now.
-
-        toast.success("Welcome back!")
-        if (res.role === "company") {
-          router.push("/company/dashboard")
-        } else if (res.role === "technician") {
-          router.push("/technician/dashboard")
-        } else if (res.role === "admin") {
-          router.push("/admin/dashboard")
-        }
-      } else {
-        if (res.error === 'pending') {
-          toast.info(res.message)
-          setStep("waiting")
-        } else if (res.error === 'no_password') {
-          toast.info("Please set up your password")
-          router.push("/setup-password")
-        } else if (res.error === 'profile_incomplete') {
-          toast.info("Please complete your profile setup")
-          if (res.role === 'company') {
-            router.push("/setup/company")
-          } else if (res.role === 'technician') {
-            router.push("/setup/technician")
-          }
-        } else if (res.error === 'banned') {
-          toast.error("Account suspended. Access denied.")
-        } else if (res.error === 'rejected') {
-          toast.error("Registration rejected. Please contact support.")
-        } else if (res.error === 'not_found') {
-          setErrorMessage("No account available. Please Sign Up to continue.")
-        } else {
-          toast.error(res.message || "Login failed")
-        }
-      }
-    } catch (error) {
-      toast.error("Login failed. Please try again.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // When user clicks Get OTP, show verify-required step
-  const handleGetOTP = async () => {
-    if (phone.length !== 10) {
-      toast.error("Please enter a valid 10-digit phone number")
-      return
-    }
-
     setIsLoading(true)
     try {
       const status = await api.checkUserStatus(phone)
 
       if (!status.exists) {
-        // New User -> Verification Required
-        setStep("verify-required")
+        setErrorMessage("No account available. Please Sign Up to continue.")
+        toast.error("No account found with this phone number. Please register first.")
       } else {
-        // Existing User Logic
-        if (status.status === 'pending') {
+        setRole(status.role)
+        if (status.status === 'PENDING_APPROVAL' || status.status === 'PENDING_PROFILE') {
           setStep("waiting")
-        } else if (status.status === 'active') {
-          if (status.hasPassword) {
-            toast.info("Account exists. Please login with your password.")
-            setStep("login")
+        } else if (status.status === 'ACTIVE') {
+          // Trigger OTP send
+          const res = await api.sendOTP(phone, status.role === 'admin' ? undefined : status.role)
+          if (res.success || res.message.includes("OTP")) {
+            toast.success("OTP sent to your console!")
+            setStep("otp-entry")
+            setOtpInput(["", "", "", "", "", ""])
+            // Focus first OTP field
+            setTimeout(() => {
+              document.getElementById("otp-input-0")?.focus()
+            }, 100)
           } else {
-            // Active but no password -> Show approved animation then go to setup
-            setStep("approved")
+            toast.error(res.message || "Failed to send OTP")
           }
-        } else if (status.status === 'banned') {
-          toast.error("Account suspended. Access denied.")
-        } else if (status.status === 'rejected') {
-          toast.error("Registration rejected. Please contact support.")
+        } else if (status.status === 'REJECTED') {
+          toast.error("Account suspended or rejected. Please contact support.")
         }
       }
-    } catch (e) {
+    } catch (error) {
       toast.error("An error occurred. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleVerifyOTP = async (codeStr: string) => {
+    if (codeStr.length !== 6) {
+      toast.error("Please enter a 6-digit OTP")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const res = await api.verifyOTP(phone, codeStr) as { success: boolean; message?: string; role?: string; data?: any }
+      if (res.success) {
+        toast.success("Welcome back!")
+        const userRole = res.data?.role || res.role || role
+        const targetDashboard = userRole === 'technician' ? '/technician/dashboard' : '/company/dashboard'
+        router.push(targetDashboard)
+      } else {
+        toast.error(res.message || "Invalid OTP code")
+      }
+    } catch (e) {
+      toast.error("Verification failed. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -208,16 +180,14 @@ function LoginContent() {
   const handleSubmitForVerification = async () => {
     setIsLoading(true)
     try {
-      // Cast role to "company" | "technician" (exclude admin for verify step)
       const sigupRole = role === 'admin' ? 'company' : role
       const res = await api.sendOTP(phone, sigupRole)
 
-      if (res.error === 'pending') {
+      if (res.error === 'PENDING_APPROVAL' || res.error === 'PENDING_PROFILE') {
         toast.info(res.message || "Account submitted for verification")
         setStep("waiting")
       } else if (res.success) {
-        // User already exists and is active
-        toast.info("Account exists. Please login with your password.")
+        toast.info("Account exists. Please login.")
         setStep("login")
       } else {
         toast.error(res.message || "Failed to submit")
@@ -229,11 +199,58 @@ function LoginContent() {
     }
   }
 
+  const handleOtpChange = (index: number, val: string) => {
+    const cleanVal = val.replace(/\D/g, "")
+    if (!cleanVal) return
+
+    const newOtpInput = [...otpInput]
+    newOtpInput[index] = cleanVal
+    setOtpInput(newOtpInput)
+
+    const fullCode = newOtpInput.join("")
+    if (fullCode.length === 6) {
+      handleVerifyOTP(fullCode)
+    } else if (index < 5) {
+      document.getElementById(`otp-input-${index + 1}`)?.focus()
+    }
+  }
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      const newOtpInput = [...otpInput]
+      newOtpInput[index] = ""
+      setOtpInput(newOtpInput)
+
+      if (index > 0) {
+        document.getElementById(`otp-input-${index - 1}`)?.focus()
+      }
+    }
+  }
+
+  const handleResendOTP = async () => {
+    if (role === "admin") return;
+    setIsLoading(true)
+    try {
+      const res = await api.sendOTP(phone, role as "company" | "technician")
+      if (res.success) {
+        toast.success("OTP resent successfully!")
+        setOtpInput(["", "", "", "", "", ""])
+        document.getElementById("otp-input-0")?.focus()
+      } else {
+        toast.error(res.message || "Failed to resend OTP")
+      }
+    } catch {
+      toast.error("An error occurred")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const resetFlow = () => {
     setStep("login")
     setPhone("")
-    setPassword("")
     setOtpDigits(["", "", "", "", "", ""])
+    setOtpInput(["", "", "", "", "", ""])
     setAnimatingIndex(-1)
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
@@ -241,13 +258,13 @@ function LoginContent() {
     }
   }
 
-  const handleForgotPassword = () => {
-    router.push("/reset-password")
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-950 dark:to-slate-900">
       <div className="w-full max-w-md glass p-6 sm:p-8 rounded-2xl sm:rounded-3xl shadow-xl">
+        <div className="flex justify-center mb-8">
+            <Logo size="xl" />
+        </div>
+        
         {/* Header */}
         <div className="mb-6 sm:mb-8 space-y-2 sm:space-y-3 text-center">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -255,12 +272,14 @@ function LoginContent() {
             {step === "verify-required" && "Admin Verification Required"}
             {step === "waiting" && "Verification Pending"}
             {step === "approved" && "Verified!"}
+            {step === "otp-entry" && "Enter Verification Code"}
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground">
             {step === "login" && "Sign in to continue to MaintainU"}
             {step === "verify-required" && "Your account requires admin verification"}
             {step === "waiting" && "Please wait for admin approval"}
             {step === "approved" && "Entering OTP automatically..."}
+            {step === "otp-entry" && `We've sent a 6-digit OTP code to +91 ${phone}`}
           </p>
         </div>
 
@@ -423,25 +442,51 @@ function LoginContent() {
               Go Back
             </button>
           </div>
+        ) : step === "otp-entry" ? (
+          /* OTP Entry Screen */
+          <div className="space-y-6 text-center animate-in fade-in duration-300">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto ring-8 ring-primary/5">
+              <Lock className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
+            </div>
+
+            <div className="flex justify-center gap-2 sm:gap-3 my-6 sm:my-8">
+              {otpInput.map((digit, index) => (
+                <input
+                  key={index}
+                  id={`otp-input-${index}`}
+                  type="text"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleOtpChange(index, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                  className="w-11 h-14 sm:w-12 sm:h-16 rounded-xl sm:rounded-2xl border border-border text-center text-xl sm:text-2xl font-bold bg-white/50 dark:bg-card/50 focus:bg-white dark:focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground"
+                />
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={handleResendOTP}
+                disabled={isLoading}
+                className="text-xs text-primary font-bold hover:underline"
+              >
+                Resend OTP
+              </button>
+              <button
+                type="button"
+                onClick={resetFlow}
+                className="w-full py-2.5 sm:py-3 px-6 rounded-xl bg-white dark:bg-card border border-border hover:bg-muted/50 transition-all text-sm sm:text-base font-semibold flex items-center justify-center gap-2"
+              >
+                Go Back / Change Number
+              </button>
+            </div>
+          </div>
         ) : (
           /* Login Form */
           <div className="space-y-4 sm:space-y-6">
 
-            {/* Login Role Tabs */}
-            <div className="flex bg-muted/30 p-1 rounded-xl">
-              {(['company', 'technician'] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRole(r)}
-                  className={`flex-1 py-1.5 text-[10px] sm:text-xs font-bold rounded-lg capitalize transition-all ${role === r
-                    ? "bg-white dark:bg-card shadow-sm text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
+            {/* Role automatically determined by phone number */}
 
             {/* Phone Number */}
             <div className="space-y-1.5 sm:space-y-2">
@@ -455,32 +500,10 @@ function LoginContent() {
                   placeholder="98765 43210"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  className="flex-1 px-4 py-2.5 sm:py-3 rounded-xl border border-border bg-white/50 dark:bg-card/50 focus:bg-white dark:focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm sm:text-base font-medium tracking-wide"
+                  onKeyDown={(e) => e.key === 'Enter' && phone.length === 10 && handleLogin()}
+                  className="flex-1 px-4 py-2.5 sm:py-3 rounded-xl border border-border bg-white/50 dark:bg-card/50 focus:bg-white dark:focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm sm:text-base font-medium tracking-wide text-foreground"
                   maxLength={10}
                 />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div className="space-y-1.5 sm:space-y-2">
-              <label className="text-xs sm:text-sm font-medium ml-1">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                  className="w-full pl-11 pr-12 py-2.5 sm:py-3 rounded-xl border border-border bg-white/50 dark:bg-card/50 focus:bg-white dark:focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm sm:text-base font-medium"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
               </div>
             </div>
 
@@ -488,40 +511,28 @@ function LoginContent() {
             <button
               type="button"
               onClick={handleLogin}
-              disabled={phone.length !== 10 || !password || isLoading}
+              disabled={phone.length !== 10 || isLoading}
               className="w-full py-3 sm:py-3.5 px-6 rounded-xl bg-primary text-white text-sm sm:text-base font-bold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
             >
               {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? "Sending OTP..." : "Sign In"}
             </button>
           </div>
         )
         }
 
-        {/* Forgot Password Link (Only in Login mode) */}
+        {/* Sign Up Link */}
         {step === "login" && (
-          <div className="text-right mt-2 space-y-1">
-            <button
-              onClick={handleForgotPassword}
-              className="text-xs text-primary hover:underline font-medium"
-            >
-              Forgot Password?
-            </button>
+          <div className="mt-8 pt-6 border-t border-border/50 text-center space-y-4">
             {errorMessage && (
               <div className="flex items-center justify-center gap-2 p-2 mt-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 animate-in slide-in-from-right-2">
                 <span className="text-[10px] font-medium text-center">{errorMessage}</span>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Sign Up Link */}
-        {step === "login" && (
-          <div className="mt-8 pt-6 border-t border-border/50 text-center space-y-4">
             <p className="text-sm text-muted-foreground">
               Don't have an account?{" "}
               <button
-                onClick={() => router.push("/signup" + (phone ? `?phone=${phone}` : ""))}
+                onClick={() => router.push("/onboarding")}
                 className="text-primary font-bold hover:underline"
               >
                 Sign Up
@@ -529,7 +540,6 @@ function LoginContent() {
             </p>
           </div>
         )}
-
 
       </div>
     </div>

@@ -5,18 +5,24 @@ import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
 import { BiArrowBack, BiMoon, BiSun, BiGlobe, BiChevronRight, BiCheck } from "react-icons/bi"
+import { Loader2 } from "lucide-react"
 
 export default function TechnicianSettings() {
     const router = useRouter()
     const { theme, setTheme } = useTheme()
     const [mounted, setMounted] = useState(false)
-    const [language, setLanguage] = useState("en")
 
     useEffect(() => {
         setMounted(true)
     }, [])
 
-    if (!mounted) return null
+    if (!mounted) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen pb-24 bg-background">
@@ -58,32 +64,7 @@ export default function TechnicianSettings() {
                     </div>
                 </section>
 
-                {/* Language Section */}
-                <section className="space-y-4">
-                    <h2 className="text-sm uppercase tracking-widest font-bold text-muted-foreground ml-1">Language</h2>
-                    <div className="glass-card rounded-3xl overflow-hidden p-1">
-                        {[
-                            { code: 'en', label: 'English (US)' },
-                            { code: 'hi', label: 'Hindi (हिन्दी)' },
-                            { code: 'ta', label: 'Tamil (தமிழ்)' }
-                        ].map((lang) => (
-                            <button
-                                key={lang.code}
-                                onClick={() => setLanguage(lang.code)}
-                                className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${language === lang.code ? 'bg-primary/5 text-primary' : 'hover:bg-muted/50 text-foreground'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-full ${language === lang.code ? 'bg-primary/10' : 'bg-muted'}`}>
-                                        <BiGlobe className="w-5 h-5" />
-                                    </div>
-                                    <span className="font-semibold">{lang.label}</span>
-                                </div>
-                                {language === lang.code && <BiCheck className="w-6 h-6 text-primary" />}
-                            </button>
-                        ))}
-                    </div>
-                </section>
+
 
             </div>
 

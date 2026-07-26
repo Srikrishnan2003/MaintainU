@@ -80,6 +80,35 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
+/* Admin app identity — Blue */
+.app-admin {
+  --color-accent: #1d4ed8;
+  --color-accent-hover: #1e40af;
+  --color-accent-light: #eff6ff;
+  --color-accent-text: #1d4ed8;
+}
+
+/* Technician app identity — Emerald */
+.app-technician {
+  --color-accent: #059669;
+  --color-accent-hover: #047857;
+  --color-accent-light: #ecfdf5;
+  --color-accent-text: #059669;
+}
+
+/* Company app identity — Violet */
+.app-company {
+  --color-accent: #7c3aed;
+  --color-accent-hover: #6d28d9;
+  --color-accent-light: #f5f3ff;
+  --color-accent-text: #7c3aed;
+}
+
+/* Dark mode variants */
+.dark .app-admin  { --color-accent: #3b82f6; --color-accent-light: rgba(59,130,246,0.15); }
+.dark .app-technician { --color-accent: #10b981; --color-accent-light: rgba(16,185,129,0.15); }
+.dark .app-company { --color-accent: #8b5cf6; --color-accent-light: rgba(139,92,246,0.15); }
+
 @theme inline {
   --font-sans: var(--font-sans), sans-serif;
   --font-mono: monospace;

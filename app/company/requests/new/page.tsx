@@ -4,7 +4,9 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { api } from "@/lib/api"
 import { toast } from "sonner"
-import { Zap, Settings, Wrench, Thermometer, Droplet, X, Loader2, ChevronLeft, ChevronRight, CheckCircle, Plus, Link } from "lucide-react"
+import { Zap, Settings, Wrench, Thermometer, Droplet, X, Loader2, ChevronLeft, ChevronRight, CheckCircle, File as FileIcon, Trash2 } from "lucide-react"
+import { ServiceIcon } from "@/components/ui/service-icon"
+import { UploadDropzone } from "@/lib/uploadthing"
 
 export default function NewRequestPage() {
   const router = useRouter()
@@ -17,6 +19,7 @@ export default function NewRequestPage() {
     photos: [] as string[],
     date: "",
     timeSlot: "",
+    location: "",
     supervisor: "",
     supervisorPhone: "",
   })
@@ -26,6 +29,18 @@ export default function NewRequestPage() {
   }
 
   const handleNext = () => {
+    if (step === 1 && !formData.serviceType) {
+      toast.error("Please select a service type");
+      return;
+    }
+    if (step === 2 && formData.description.length < 50) {
+      toast.error(`Description must be at least 50 characters (currently ${formData.description.length}).`);
+      return;
+    }
+    if (step === 3 && (!formData.date || !formData.timeSlot || formData.location.trim().length < 3)) {
+      toast.error("Please select a date, time slot, and provide a valid location (min 3 characters)");
+      return;
+    }
     if (step < 4) setStep(step + 1)
   }
 
@@ -51,10 +66,13 @@ export default function NewRequestPage() {
         toast.success("Request created successfully")
         router.push(`/company/requests/${res.id}`)
       } else {
-        console.error("Request failed:", res.message)
+        console.error("Request failed:", res.message, res.fieldErrors)
         if (res.message === "Not authenticated" || res.message === "User not found") {
           toast.error("Session expired. Please login again.")
           router.push("/login")
+        } else if (res.fieldErrors) {
+          const errs = Object.values(res.fieldErrors).flat().join(", ");
+          toast.error(`Validation Error: ${errs}`);
         } else {
           toast.error(res.message || "Failed to create request")
         }
@@ -67,13 +85,6 @@ export default function NewRequestPage() {
     }
   }
 
-  const serviceIcons: Record<string, React.ReactNode> = {
-    Electrical: <Zap className="w-6 h-6" />,
-    Mechanical: <Settings className="w-6 h-6" />,
-    Assembly: <Wrench className="w-6 h-6" />,
-    HVAC: <Thermometer className="w-6 h-6" />,
-    Plumbing: <Droplet className="w-6 h-6" />,
-  }
 
   return (
     <div className="min-h-screen pb-32 bg-background text-foreground">
@@ -129,7 +140,7 @@ export default function NewRequestPage() {
                     ? "bg-primary text-white"
                     : "bg-muted text-muted-foreground group-hover:text-primary"
                     }`}>
-                    {serviceIcons[service.id]}
+                    {<ServiceIcon type={service.id} className="w-6 h-6" />}
                   </div>
                   <span className="font-semibold">{service.label}</span>
                   {formData.serviceType === service.id && (
@@ -173,65 +184,79 @@ export default function NewRequestPage() {
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Describe the maintenance issue in detail (min 50 characters)..."
-              className="w-full h-40 p-4 rounded-xl border border-border bg-card/50 glass focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none mb-6"
+              className="w-full h-40 p-4 rounded-xl border border-border bg-card/50 glass focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none mb-2"
             />
+            <div className="flex justify-end mb-6">
+              <span className={`text-xs font-medium ${formData.description.length < 50 ? 'text-red-500/80' : 'text-green-500/80'}`}>
+                {formData.description.length} / 50 min characters
+              </span>
+            </div>
 
             <div className="mb-8">
               <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-semibold block">Issue Photos (URLs)</label>
-                <button
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, photos: [...prev.photos, ""] }))}
-                  className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
-                >
-                  <Plus className="w-3 h-3" /> Add More
-                </button>
+                <label className="text-sm font-semibold block">Issue Photos & Documents</label>
               </div>
 
               <div className="space-y-3">
-                {formData.photos.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, photos: [""] }))}
-                    className="w-full py-8 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary/50 transition-all bg-card/30"
-                  >
-                    <Plus className="w-6 h-6" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Add first photo link</span>
-                  </button>
-                ) : (
-                  formData.photos.map((url, idx) => (
-                    <div key={idx} className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Link className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <input
-                          type="url"
-                          placeholder="https://example.com/photo.jpg"
-                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-border bg-card/50 glass focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-                          value={url}
-                          onChange={(e) => {
-                            const newPhotos = [...formData.photos]
-                            newPhotos[idx] = e.target.value
+                <UploadDropzone
+                  endpoint="requestAttachment"
+                  onUploadBegin={() => {
+                    toast.loading("Uploading file...", { id: "upload-toast" });
+                  }}
+                  onClientUploadComplete={(res) => {
+                    toast.dismiss("upload-toast");
+                    if (res && res.length > 0) {
+                      const newPhotos = res.map(file => file.url);
+                      setFormData(prev => ({ ...prev, photos: [...prev.photos, ...newPhotos] }));
+                      toast.success("Files uploaded successfully");
+                    }
+                  }}
+                  onUploadError={(error: Error) => {
+                    toast.dismiss("upload-toast");
+                    toast.error(`Upload failed: ${error.message}`);
+                  }}
+                  className="ut-label:text-primary ut-button:bg-primary ut-button:ut-readying:bg-primary/50 border-border bg-card/30 rounded-xl transition-all"
+                />
+
+                {formData.photos.length > 0 && (
+                  <div className="grid gap-2 mt-4">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Attached Files</p>
+                    {formData.photos.map((url, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-border bg-card/50 glass">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                           <div className="w-12 h-12 shrink-0 bg-muted rounded-lg overflow-hidden flex items-center justify-center relative shadow-sm border border-border">
+                             <img 
+                               src={url} 
+                               alt="preview" 
+                               className="w-full h-full object-cover" 
+                               onError={(e) => { 
+                                 e.currentTarget.style.display = 'none'; 
+                                 if (e.currentTarget.nextElementSibling) {
+                                   e.currentTarget.nextElementSibling.classList.remove('hidden');
+                                 }
+                               }} 
+                             />
+                             <FileIcon className="w-6 h-6 text-muted-foreground hidden absolute" />
+                           </div>
+                           <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:underline truncate">
+                             View Attachment {idx + 1}
+                           </a>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newPhotos = formData.photos.filter((_, i) => i !== idx)
                             setFormData({ ...formData, photos: newPhotos })
                           }}
-                        />
+                          className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newPhotos = formData.photos.filter((_, i) => i !== idx)
-                          setFormData({ ...formData, photos: newPhotos })
-                        }}
-                        className="p-3 text-red-500 hover:bg-red-500/10 rounded-xl transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </div>
-              <p className="text-[10px] text-muted-foreground mt-3 font-medium uppercase tracking-tighter">
-                * Note: Enter public direct image links for now. Dynamic uploads coming soon.
-              </p>
             </div>
           </div>
         )}
@@ -273,6 +298,17 @@ export default function NewRequestPage() {
               </div>
 
               <div>
+                <label className="text-sm font-semibold mb-2 block">Site Location</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Factory Unit 1, Sector 5"
+                  className="w-full p-4 rounded-xl border border-border bg-card/50 glass focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all mb-6"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                />
+              </div>
+
+              <div>
                 <label className="text-sm font-semibold mb-2 block">Site Supervisor</label>
                 <div className="space-y-3">
                   <input
@@ -305,7 +341,7 @@ export default function NewRequestPage() {
               <div className="glass-card p-5 rounded-2xl">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Service Type</p>
                 <div className="flex items-center gap-2">
-                  <div className="text-primary">{serviceIcons[formData.serviceType]}</div>
+                  <div className="text-primary"><ServiceIcon type={formData.serviceType} className="w-6 h-6" /></div>
                   <p className="text-lg font-semibold capitalize">{formData.serviceType}</p>
                 </div>
               </div>
@@ -327,8 +363,8 @@ export default function NewRequestPage() {
                     <p className="text-sm text-muted-foreground">{formData.timeSlot}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">{formData.supervisor || "No supervisor"}</p>
-                    <p className="text-sm text-muted-foreground">{formData.supervisorPhone}</p>
+                    <p className="font-medium">{formData.location || "No location"}</p>
+                    <p className="text-sm text-muted-foreground">{formData.supervisor || "No supervisor"} ({formData.supervisorPhone})</p>
                   </div>
                 </div>
               </div>
@@ -350,12 +386,7 @@ export default function NewRequestPage() {
           {step < 4 ? (
             <button
               onClick={handleNext}
-              disabled={
-                (step === 1 && !formData.serviceType) ||
-                (step === 2 && formData.description.length < 50) ||
-                (step === 3 && (!formData.date || !formData.timeSlot))
-              }
-              className="flex-[2] py-4 px-6 rounded-xl bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-[2] py-4 px-6 rounded-xl bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
               Next
               <ChevronRight className="w-4 h-4" />

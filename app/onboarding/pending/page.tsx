@@ -4,24 +4,45 @@ import { useRouter } from "next/navigation"
 import { Clock, ShieldCheck, Home } from "lucide-react"
 import { useEffect } from "react"
 import { api } from "@/lib/api"
+import { useSSE } from "@/hooks/use-sse"
 
 export default function PendingVerificationPage() {
     const router = useRouter()
 
+    const { accountApproved, fallbackMode } = useSSE(true)
+
+    // Handle SSE Approval
     useEffect(() => {
+        if (accountApproved) {
+            api.refreshSession().then((res) => {
+                if (res && res.success && res.status === 'ACTIVE') {
+                    const target = res.role === 'technician' ? '/technician/dashboard' : res.role === 'company' ? '/company/dashboard' : '/';
+                    router.push(target);
+                } else {
+                    router.push("/");
+                }
+            }).catch(() => {
+                router.push("/");
+            });
+        }
+    }, [accountApproved, router]);
+
+    // Fallback Polling
+    useEffect(() => {
+        if (!fallbackMode) return;
         const interval = setInterval(async () => {
             try {
-                const res = await api.refreshSession()
-                if (res.success && res.status === 'active') {
-                    // Account approved! Redirect to password setup
-                    router.push("/setup-password")
+                const res = await api.refreshSession();
+                if (res.success && res.status === 'ACTIVE') {
+                    const target = res.role === 'technician' ? '/technician/dashboard' : res.role === 'company' ? '/company/dashboard' : '/';
+                    router.push(target);
                 }
             } catch (e) {
                 // ignore
             }
-        }, 3000)
-        return () => clearInterval(interval)
-    }, [router])
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [fallbackMode, router]);
 
     return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-950 dark:to-slate-900">

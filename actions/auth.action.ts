@@ -1,0 +1,205 @@
+"use server";
+
+import { z } from "zod";
+import { db } from "@/lib/db";
+import { users, companies, technicians } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import type { NewTechnician, NewCompany } from "@/db/types";
+import { createOTP, verifyOTP } from "@/services/otp.service";
+import { createSession, destroySession, getSession } from "@/services/auth.service";
+import { checkRateLimit } from "@/lib/rate-limiter";
+import { getUserByPhone } from "@/services/user.service";
+import { redirect } from "next/navigation";
+
+// ─── Verification Schemas ───────────────────────────────────────────
+
+const phoneSchema = z.object({
+    phone: z.string().regex(/^\+?[\d\s-]{10,15}$/, "Invalid phone format"),
+});
+
+const otpSchema = phoneSchema.extend({
+    otp: z.string().length(6, "OTP must be exactly 6 digits").regex(/^\d+$/, "OTP must be numeric"),
+});
+
+// ─── API Endpoints / Server Actions ─────────────────────────────────
+
+export interface ApiResponse<T = any> {
+    success: boolean;
+    message: string;
+    data?: T;
+    error?: string;
+}
+
+/**
+ * Standardize phone representation before hitting DB/Services.
+ */
+function normalizePhone(phone: string): string {
+    return phone.replace(/[^\d+]/g, ""); // Keep only digits and leading '+'
+}
+
+/**
+ * Initiates an OTP request or handles initial registration/pending status.
+ * Migrated from monolithic sendOTPAction.
+ */
+export async function sendOTP(phoneInput: string, inputRole?: "company" | "technician", details?: any): Promise<ApiResponse> {
+    try {
+        const parsed = phoneSchema.safeParse({ phone: phoneInput });
+        if (!parsed.success) return { success: false, message: parsed.error.issues[0].message };
+        
+        const normalizedPhone = normalizePhone(parsed.data.phone);
+
+        const rateLimit = await checkRateLimit(normalizedPhone, "otp");
+        if (!rateLimit.success) {
+            return { success: false, message: "Too many requests. Please try again later." };
+        }
+
+        const existingUsers = await db.select().from(users).where(eq(users.phone, normalizedPhone)).limit(1);
+        const user = existingUsers[0];
+
+        if (user) {
+            // Handle Pending statuses (profile not yet submitted, or not yet approved)
+            if (user.status === 'PENDING_PROFILE' || user.status === 'PENDING_APPROVAL') {
+                const updates: any = {};
+                if (inputRole && inputRole !== user.role) updates.role = inputRole;
+                if (details?.name || details?.companyName) updates.name = details?.name || details?.companyName;
+
+                if (Object.keys(updates).length > 0) {
+                    await db.update(users).set(updates).where(eq(users.id, user.id));
+                }
+
+                // Sync Profile Details
+                if (user.role === 'technician' || inputRole === 'technician') {
+                    const existingTech = await db.query.technicians.findFirst({ where: eq(technicians.userId, user.id) });
+                    const techData: any = { userId: user.id, ...details, status: 'PENDING_PROFILE' };
+                    if (existingTech) await db.update(technicians).set(techData).where(eq(technicians.id, existingTech.id));
+                    else await db.insert(technicians).values(techData);
+                } else if (user.role === 'company' || inputRole === 'company') {
+                    const existingComp = await db.query.companies.findFirst({ where: eq(companies.userId, user.id) });
+                    const compData: any = { userId: user.id, ...details };
+                    if (existingComp) await db.update(companies).set(compData).where(eq(companies.id, existingComp.id));
+                    else await db.insert(companies).values(compData);
+                }
+
+                await createSession({ id: user.id, role: user.role, status: user.status });
+                return { success: false, error: "PENDING_APPROVAL", message: "Account pending verification" };
+            }
+
+            if (user.status === 'REJECTED') return { success: false, error: "banned", message: "Account suspended or rejected" };
+
+            // Handle Rejected — this branch now unreachable but kept for safety
+            // Re-submission flow is handled above in the PENDING check
+        } else {
+            // New User flow (Self-registration)
+            const role = inputRole || "company";
+            const [newUser] = await db.insert(users).values({
+                phone: normalizedPhone,
+                role,
+                status: 'PENDING_PROFILE',
+                name: details?.name || details?.companyName || "New User"
+            }).returning();
+
+            if (role === 'technician') {
+                const techInsert: NewTechnician = {
+                    userId: newUser.id,
+                    status: 'PENDING_PROFILE',
+                    dob: details?.dob || undefined,
+                    gender: details?.gender,
+                    address: details?.address,
+                    experience: details?.experience ? Number(details.experience) : undefined,
+                    primarySkill: details?.primarySkill,
+                };
+                await db.insert(technicians).values(techInsert);
+            } else {
+                const compInsert: NewCompany = {
+                    userId: newUser.id,
+                    companyName: details?.companyName || details?.name || "New User",
+                    address: details?.address || "Pending",
+                    industryType: details?.industryType || "General",
+                    email: details?.email,
+                    gstin: details?.gstin,
+                    contactPerson: details?.contactPerson,
+                    spokespersonPhone: details?.spokespersonPhone,
+                };
+                await db.insert(companies).values(compInsert);
+            }
+
+            await createSession({ id: newUser.id, role: newUser.role, status: 'PENDING_PROFILE' });
+            return { success: false, error: "PENDING_PROFILE", message: "Account submitted for verification" };
+        }
+
+        // Standard OTP trigger for Active users
+        const otpResult = await createOTP(normalizedPhone);
+        if (!otpResult.success) return { success: false, message: otpResult.message };
+
+        return { success: true, message: "OTP sent successfully" };
+    } catch (error) {
+        console.error("sendOTP error:", error);
+        return { success: false, message: "An error occurred" };
+    }
+}
+
+/**
+ * Standard verification flow.
+ */
+export async function verifyOTPAction(phoneInput: string, otpInput: string): Promise<ApiResponse> {
+    try {
+        const parsed = otpSchema.safeParse({ phone: phoneInput, otp: otpInput });
+        if (!parsed.success) return { success: false, message: parsed.error.issues[0].message };
+
+        const normalizedPhone = normalizePhone(parsed.data.phone);
+        const { otp } = parsed.data;
+
+        const verifyResult = await verifyOTP(normalizedPhone, otp);
+        if (!verifyResult.success) return { success: false, message: verifyResult.message };
+
+        const user = await getUserByPhone(normalizedPhone);
+        if (!user) return { success: false, message: "User not found" };
+
+        await createSession({ id: user.id, role: user.role, status: user.status });
+
+        if (user.status === "PENDING_PROFILE" || user.status === "PENDING_APPROVAL") return { success: false, error: "pending", message: "Account pending verification" };
+        if (user.status === "REJECTED") return { success: false, error: "banned", message: "Account suspended or rejected" };
+
+        return { success: true, message: "Authentication successful", data: user };
+    } catch (error) {
+        console.error("verifyOTP error:", error);
+        return { success: false, message: "An error occurred" };
+    }
+}
+
+export async function logoutAction() {
+    await destroySession();
+    return { success: true };
+}
+
+export async function refreshSessionAction() {
+    const session = await getSession();
+    if (!session) return { success: false };
+
+    try {
+        const user = await db.query.users.findFirst({ where: eq(users.id, session.userId) });
+        if (!user) return { success: false };
+
+        if (user.status !== session.status) {
+            await createSession({ id: user.id, role: user.role, status: user.status });
+        }
+
+        return {
+            success: true,
+            status: user.status,
+            role: user.role,
+            name: user.name,
+            phone: user.phone,
+            profileCompleted: user.profileCompleted
+        };
+    } catch (e) {
+        return { success: false };
+    }
+}
+
+export async function checkUserStatusAction(phone: string) {
+    const normalizedPhone = normalizePhone(phone);
+    const user = await getUserByPhone(normalizedPhone);
+    if (!user) return { exists: false, status: "PENDING_PROFILE", role: "company" as const };
+    return { exists: true, status: user.status, role: user.role };
+}

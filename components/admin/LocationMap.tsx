@@ -82,7 +82,7 @@ export default function LocationMap({ techs, mapStyleUrl }: LocationMapProps) {
             </div>
 
             <MapContainer
-                center={[12.9716, 77.5946] as any}
+                center={[12.9716, 77.5946] as unknown as [number, number]}
                 zoom={12}
                 style={{ height: '100%', width: '100%', minHeight: '500px' }}
                 className="z-0 rounded-3xl"

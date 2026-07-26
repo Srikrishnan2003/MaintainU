@@ -5,7 +5,7 @@ import { BiUser, BiCog, BiLogOut, BiChevronRight, BiBuilding, BiPhone, BiEnvelop
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useEffect, useState } from "react"
-import { getCompanyProfileAction, updateCompanyProfileAction } from "@/lib/actions"
+import { getCompanyProfileAction, updateCompanyProfileAction } from "@/actions/company.action"
 import { api } from "@/lib/api"
 import {
     Dialog,
@@ -16,12 +16,15 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Loader2 } from "lucide-react"
+
+let cachedProfile: any = null;
 
 export default function CompanyProfile() {
     const router = useRouter()
 
-    const [profile, setProfile] = useState<any>(null)
-    const [loading, setLoading] = useState(true)
+    const [profile, setProfile] = useState<any>(cachedProfile)
+    const [loading, setLoading] = useState(!cachedProfile)
     const [isEditing, setIsEditing] = useState(false)
     const [editingData, setEditingData] = useState<any>({})
     const [updating, setUpdating] = useState(false)
@@ -30,6 +33,7 @@ export default function CompanyProfile() {
         try {
             const res = await getCompanyProfileAction()
             if (res.success) {
+                cachedProfile = res.data;
                 setProfile(res.data)
                 setEditingData({
                     companyName: res.data?.companyName,
@@ -76,7 +80,11 @@ export default function CompanyProfile() {
                 setIsEditing(false)
                 fetchProfile()
             } else {
-                toast.error(res.message || "Update failed")
+                if (res.fieldErrors) {
+                    toast.error(`Validation Error: ${Object.values(res.fieldErrors).flat().join(", ")}`)
+                } else {
+                    toast.error(res.message || "Update failed")
+                }
             }
         } catch (e) {
             toast.error("Failed to update profile")
@@ -88,7 +96,7 @@ export default function CompanyProfile() {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
         )
     }
@@ -149,14 +157,17 @@ export default function CompanyProfile() {
                         </div>
                         <BiChevronRight className="w-5 h-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
                     </button>
-                    <button className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors rounded-2xl group">
+                    <button 
+                        onClick={() => toast.info("Privacy and Security policies will be updated soon!")}
+                        className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors rounded-2xl group"
+                    >
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-slate-500/10 rounded-2xl text-slate-500 group-hover:text-foreground transition-colors">
                                 <BiShield className="w-5 h-5" />
                             </div>
                             <span className="font-semibold text-sm">Privacy & Security</span>
                         </div>
-                        <BiChevronRight className="w-5 h-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mr-2 bg-primary/10 text-primary px-2 py-1 rounded-full">Soon</span>
                     </button>
                 </section>
 

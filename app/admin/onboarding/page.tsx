@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react"
 import { BottomNav } from "@/components/navigation/bottom-nav"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
-import { Search, User, Check, X, ShieldAlert, RotateCcw, Building2, Wrench, Filter, Trash2 } from "lucide-react"
+import { Search, User, Check, X, ShieldAlert, RotateCcw, Building2, Wrench, Filter, Trash2, Eye } from "lucide-react"
 import { api, User as UserType } from "@/lib/api"
-import { deleteUserAction } from "@/lib/actions"
+import { deleteUserAction } from "@/actions/admin.action"
 import { toast } from "sonner"
 import {
     AlertDialog,
@@ -17,9 +17,17 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription
+} from "@/components/ui/dialog"
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
 
 export default function UserManagementPage() {
-    const [activeTab, setActiveTab] = useState<"all" | "pending" | "active" | "banned" | "rejected" | "reset">("pending")
+    const [activeTab, setActiveTab] = useState<"all" | "pending" | "active" | "banned" | "rejected">("pending")
     const [roleFilter, setRoleFilter] = useState<"all" | "company" | "technician">("all")
     const [loading, setLoading] = useState(true)
     const [users, setUsers] = useState<{
@@ -27,19 +35,41 @@ export default function UserManagementPage() {
         pending: UserType[],
         active: UserType[],
         banned: UserType[],
-        rejected: UserType[],
-        reset: UserType[]
+        rejected: UserType[]
     }>({
         all: [],
         pending: [],
         active: [],
         banned: [],
-        rejected: [],
-        reset: []
+        rejected: []
     })
     const [search, setSearch] = useState("")
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [userToDelete, setUserToDelete] = useState<string | null>(null)
+
+    const [detailsOpen, setDetailsOpen] = useState(false)
+    const [selectedUserDetails, setSelectedUserDetails] = useState<any>(null)
+    const [detailsLoading, setDetailsLoading] = useState(false)
+
+    const handleViewDetails = async (userId: string) => {
+        setDetailsOpen(true)
+        setDetailsLoading(true)
+        setSelectedUserDetails(null)
+        try {
+            const res = await api.getUserDetails(userId)
+            if (res.success) {
+                setSelectedUserDetails(res.user)
+            } else {
+                toast.error("Failed to load details")
+                setDetailsOpen(false)
+            }
+        } catch {
+            toast.error("Error loading details")
+            setDetailsOpen(false)
+        } finally {
+            setDetailsLoading(false)
+        }
+    }
 
     const handleDeleteConfirm = async () => {
         if (!userToDelete) return
@@ -61,13 +91,12 @@ export default function UserManagementPage() {
             const res = await api.getUsers()
             if (res.users) {
                 const all = res.users
-                const pending = all.filter((u: any) => u.status === 'pending' || u.status === 'Pending')
-                const active = all.filter((u: any) => (u.status === 'active' || u.status === 'Active') && u.resetStatus !== 'requested')
-                const banned = all.filter((u: any) => u.status === 'banned' || u.status === 'Banned')
-                const rejected = all.filter((u: any) => u.status === 'rejected' || u.status === 'Rejected')
-                const reset = all.filter((u: any) => u.resetStatus === 'requested')
+                const pending = all.filter((u: any) => u.status === 'PENDING_APPROVAL' || u.status === 'PENDING_PROFILE')
+                const active = all.filter((u: any) => u.status === 'ACTIVE')
+                const banned = all.filter((u: any) => u.status === 'REJECTED')
+                const rejected = all.filter((u: any) => u.status === 'REJECTED')
 
-                setUsers({ all, pending, active, banned, rejected, reset })
+                setUsers({ all, pending, active, banned, rejected })
             }
         } catch (e) {
             toast.error("Failed to load users")
@@ -80,10 +109,16 @@ export default function UserManagementPage() {
         fetchUsers()
     }, [])
 
-    const handleStatusUpdate = async (userId: string, status: "active" | "banned" | "rejected" | "pending") => {
+    const handleStatusUpdate = async (userId: string, status: "PENDING_PROFILE" | "PENDING_APPROVAL" | "ACTIVE" | "REJECTED") => {
         try {
             await api.updateUserStatus(userId, status)
-            toast.success(`User status updated to ${status}`)
+            let statusMessage = "updated"
+            if (status === "ACTIVE") statusMessage = "approved and activated"
+            if (status === "REJECTED") statusMessage = "rejected and banned"
+            if (status === "PENDING_APPROVAL") statusMessage = "moved to pending approval"
+            if (status === "PENDING_PROFILE") statusMessage = "reset to pending profile"
+            
+            toast.success(`User account successfully ${statusMessage}`)
             fetchUsers()
         } catch {
             toast.error("Failed to update status")
@@ -101,16 +136,6 @@ export default function UserManagementPage() {
         }
     }
 
-    const handleApproveReset = async (userId: string) => {
-        try {
-            await api.approvePasswordReset(userId)
-            toast.success("Password reset approved")
-            fetchUsers()
-        } catch {
-            toast.error("Failed to approve reset")
-        }
-    }
-
     const filteredList = users[activeTab].filter(u => {
         const matchesSearch = u.name?.toLowerCase().includes(search.toLowerCase()) ||
             u.phone.includes(search) ||
@@ -121,8 +146,135 @@ export default function UserManagementPage() {
         return matchesSearch && matchesRole
     })
 
-    const tabs: Array<"all" | "pending" | "active" | "banned" | "rejected" | "reset"> = ["all", "pending", "active", "banned", "rejected", "reset"]
+    const tabs: Array<"all" | "pending" | "active" | "banned" | "rejected"> = ["all", "pending", "active", "banned", "rejected"]
     const roles: Array<"all" | "company" | "technician"> = ["all", "company", "technician"]
+
+    const groupedUsers = {
+        admin: filteredList.filter(u => u.role === 'admin'),
+        company: filteredList.filter(u => u.role === 'company'),
+        technician: filteredList.filter(u => u.role === 'technician'),
+        other: filteredList.filter(u => !['admin', 'company', 'technician'].includes(u.role))
+    }
+
+    const renderUserCard = (user: UserType) => (
+        <div
+            key={user.id}
+            className="glass-card p-4 rounded-2xl flex flex-col gap-4 group hover:border-primary/30 transition-all duration-300"
+        >
+            <div className="flex items-start justify-between">
+                {/* User Info */}
+                <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner ring-1 ring-border/50 ${user.role === 'company'
+                        ? 'bg-blue-50 dark:bg-blue-900/20'
+                        : user.role === 'technician'
+                            ? 'bg-purple-50 dark:bg-purple-900/20'
+                            : 'bg-slate-50 dark:bg-slate-900/20'
+                        }`}>
+                        {user.role === 'company' && <Building2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />}
+                        {user.role === 'technician' && <Wrench className="w-6 h-6 text-purple-600 dark:text-purple-400" />}
+                        {user.role === 'admin' && <ShieldAlert className="w-6 h-6 text-slate-600 dark:text-slate-400" />}
+                        {!['company', 'technician', 'admin'].includes(user.role) && <User className="w-6 h-6 text-muted-foreground" />}
+                    </div>
+                    <div>
+                        <p className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">
+                            {user.name || "New User"}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                            {user.phone}
+                        </p>
+                        <div className="flex gap-2 mt-2">
+
+                            {/* Clickable Badge for Pending Users */}
+                            <button
+                                disabled={user.status !== 'PENDING_APPROVAL' && user.status !== 'PENDING_PROFILE'}
+                                onClick={() => handleRoleToggle(user)}
+                                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1 transition-all ${(user.status === 'PENDING_APPROVAL' || user.status === 'PENDING_PROFILE') ? 'cursor-pointer hover:ring-1 hover:ring-current active:scale-95' : 'cursor-default'
+                                    } ${user.role === 'company' ? 'bg-blue-500/10 text-blue-600' :
+                                        user.role === 'technician' ? 'bg-purple-500/10 text-purple-600' :
+                                            'bg-slate-500/10 text-slate-600'
+                                    }`}>
+                                {user.role}
+                                {(user.status === 'PENDING_APPROVAL' || user.status === 'PENDING_PROFILE') && <RotateCcw className="w-3 h-3 ml-1 opacity-50" />}
+                            </button>
+
+                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${user.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600' :
+                                (user.status === 'PENDING_APPROVAL' || user.status === 'PENDING_PROFILE') ? 'bg-orange-500/10 text-orange-600' :
+                                    user.status === 'REJECTED' ? 'bg-red-500/10 text-red-600' :
+                                        'bg-slate-500/10 text-muted-foreground'
+                                }`}>
+                                {user.status}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-3 border-t border-border/40">
+                <button
+                    onClick={() => handleViewDetails(user.id)}
+                    className="flex-1 py-2.5 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400 font-semibold text-sm hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all flex items-center justify-center gap-2 border border-blue-200 dark:border-blue-900/30 active:scale-95"
+                >
+                    <Eye className="w-4 h-4" strokeWidth={2.5} /> View Details
+                </button>
+                {(user.status === 'PENDING_APPROVAL' || user.status === 'PENDING_PROFILE') && (
+                    <>
+                        <button
+                            onClick={() => handleStatusUpdate(user.id, "ACTIVE")}
+                            className="flex-1 py-2.5 rounded-xl bg-green-500 text-white font-semibold text-sm hover:bg-green-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 active:scale-95"
+                        >
+                            <Check className="w-4 h-4" strokeWidth={2.5} /> Approve
+                        </button>
+                        <button
+                            onClick={() => handleStatusUpdate(user.id, "REJECTED")}
+                            className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400 font-semibold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-all flex items-center justify-center gap-2 border border-red-200 dark:border-red-900/30 active:scale-95"
+                        >
+                            <X className="w-4 h-4" strokeWidth={2.5} /> Reject
+                        </button>
+                    </>
+                )}
+
+                {user.status === 'REJECTED' && (
+                    <button
+                        onClick={() => handleStatusUpdate(user.id, "ACTIVE")}
+                        className="flex-1 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                    >
+                        <RotateCcw className="w-4 h-4" /> Re-admit / Approve
+                    </button>
+                )}
+
+                {user.status === 'ACTIVE' && (
+                    <button
+                        onClick={() => handleStatusUpdate(user.id, "REJECTED")}
+                        className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400 font-semibold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-all flex items-center justify-center gap-2 border border-red-200 dark:border-red-900/30 active:scale-95"
+                    >
+                        Ban User
+                    </button>
+                )}
+
+                {user.status === 'REJECTED' && (
+                    <button
+                        onClick={() => handleStatusUpdate(user.id, "ACTIVE")}
+                        className="flex-1 py-2.5 rounded-xl bg-white dark:bg-card border border-border text-foreground font-semibold text-sm hover:bg-muted transition-all flex items-center justify-center gap-2"
+                    >
+                        Unban
+                    </button>
+                )}
+
+                {/* Delete Button (Available for all non-active or explicit cleanup) */}
+                <button
+                    onClick={() => {
+                        setUserToDelete(user.id)
+                        setDeleteDialogOpen(true)
+                    }}
+                    className="w-10 flex items-center justify-center rounded-xl bg-muted/50 text-muted-foreground hover:bg-red-500/10 hover:text-red-600 transition-colors"
+                    title="Delete User"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+            </div>
+        </div>
+    )
 
     return (
         <div className="min-h-screen pb-32">
@@ -186,10 +338,10 @@ export default function UserManagementPage() {
                                 }`}
                         >
                             <span className="capitalize">
-                                {tab === "reset" ? "Reset Requests" : tab}
+                                {tab}
                             </span>
 
-                            {(tab === "pending" || tab === "reset") && users[tab].length > 0 && (
+                            {tab === "pending" && users[tab].length > 0 && (
                                 <span className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all ${activeTab === tab
                                     ? "bg-white/20 text-white"
                                     : "bg-red-500/10 text-red-600 dark:text-red-400"
@@ -214,128 +366,67 @@ export default function UserManagementPage() {
                             </div>
                         </div>
                     ) : (
-                        filteredList.map((user) => (
-                            <div
-                                key={user.id}
-                                className="glass-card p-4 rounded-2xl flex flex-col gap-4 group hover:border-primary/30 transition-all duration-300"
-                            >
-                                <div className="flex items-start justify-between">
-                                    {/* User Info */}
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner ring-1 ring-border/50 ${user.role === 'company'
-                                            ? 'bg-blue-50 dark:bg-blue-900/20'
-                                            : user.role === 'technician'
-                                                ? 'bg-purple-50 dark:bg-purple-900/20'
-                                                : 'bg-slate-50 dark:bg-slate-900/20'
-                                            }`}>
-                                            {user.role === 'company' && <Building2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />}
-                                            {user.role === 'technician' && <Wrench className="w-6 h-6 text-purple-600 dark:text-purple-400" />}
-                                            {user.role === 'admin' && <ShieldAlert className="w-6 h-6 text-slate-600 dark:text-slate-400" />}
-                                            {!['company', 'technician', 'admin'].includes(user.role) && <User className="w-6 h-6 text-muted-foreground" />}
+                        <Accordion type="multiple" defaultValue={["admin", "company", "technician", "other"]} className="w-full">
+                            {groupedUsers.admin.length > 0 && (
+                                <AccordionItem value="admin" className="border-none bg-muted/5 rounded-2xl mb-4 px-4 shadow-sm border border-border/50">
+                                    <AccordionTrigger className="hover:no-underline py-4">
+                                        <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                            <ShieldAlert className="w-4 h-4" /> Administrators ({groupedUsers.admin.length})
+                                        </h2>
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <div className="space-y-3 pt-2">
+                                            {groupedUsers.admin.map(renderUserCard)}
                                         </div>
-                                        <div>
-                                            <p className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">
-                                                {user.name || "New User"}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                                                {user.phone}
-                                            </p>
-                                            <div className="flex gap-2 mt-2">
+                                    </AccordionContent>
+                                </AccordionItem>
+                            )}
 
-                                                {/* Clickable Badge for Pending Users */}
-                                                <button
-                                                    disabled={user.status !== 'pending'}
-                                                    onClick={() => handleRoleToggle(user)}
-                                                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1 transition-all ${user.status === 'pending' ? 'cursor-pointer hover:ring-1 hover:ring-current active:scale-95' : 'cursor-default'
-                                                        } ${user.role === 'company' ? 'bg-blue-500/10 text-blue-600' :
-                                                            user.role === 'technician' ? 'bg-purple-500/10 text-purple-600' :
-                                                                'bg-slate-500/10 text-slate-600'
-                                                        }`}>
-                                                    {user.role}
-                                                    {user.status === 'pending' && <RotateCcw className="w-3 h-3 ml-1 opacity-50" />}
-                                                </button>
-
-                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${user.status === 'active' ? 'bg-green-500/10 text-green-600' :
-                                                    user.status === 'pending' ? 'bg-orange-500/10 text-orange-600' :
-                                                        user.status === 'banned' ? 'bg-red-500/10 text-red-600' :
-                                                            'bg-slate-500/10 text-muted-foreground'
-                                                    }`}>
-                                                    {user.status}
-                                                </span>
-                                            </div>
+                            {groupedUsers.company.length > 0 && (
+                                <AccordionItem value="company" className="border-none bg-muted/5 rounded-2xl mb-4 px-4 shadow-sm border border-border/50">
+                                    <AccordionTrigger className="hover:no-underline py-4">
+                                        <h2 className="text-sm font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                                            <Building2 className="w-4 h-4" /> Companies ({groupedUsers.company.length})
+                                        </h2>
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <div className="space-y-3 pt-2">
+                                            {groupedUsers.company.map(renderUserCard)}
                                         </div>
-                                    </div>
-                                </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            )}
 
-                                {/* Actions */}
-                                <div className="flex gap-2 pt-3 border-t border-border/40">
-                                    {user.status === 'pending' && (
-                                        <>
-                                            <button
-                                                onClick={() => handleStatusUpdate(user.id, "active")}
-                                                className="flex-1 py-2.5 rounded-xl bg-green-500 text-white font-semibold text-sm hover:bg-green-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 active:scale-95"
-                                            >
-                                                <Check className="w-4 h-4" strokeWidth={2.5} /> Approve
-                                            </button>
-                                            <button
-                                                onClick={() => handleStatusUpdate(user.id, "rejected")}
-                                                className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400 font-semibold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-all flex items-center justify-center gap-2 border border-red-200 dark:border-red-900/30 active:scale-95"
-                                            >
-                                                <X className="w-4 h-4" strokeWidth={2.5} /> Reject
-                                            </button>
-                                        </>
-                                    )}
+                            {groupedUsers.technician.length > 0 && (
+                                <AccordionItem value="technician" className="border-none bg-muted/5 rounded-2xl mb-4 px-4 shadow-sm border border-border/50">
+                                    <AccordionTrigger className="hover:no-underline py-4">
+                                        <h2 className="text-sm font-bold text-purple-500 uppercase tracking-widest flex items-center gap-2">
+                                            <Wrench className="w-4 h-4" /> Technicians ({groupedUsers.technician.length})
+                                        </h2>
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <div className="space-y-3 pt-2">
+                                            {groupedUsers.technician.map(renderUserCard)}
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            )}
 
-                                    {user.status === 'rejected' && (
-                                        <button
-                                            onClick={() => handleStatusUpdate(user.id, "active")}
-                                            className="flex-1 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-                                        >
-                                            <RotateCcw className="w-4 h-4" /> Re-admit / Approve
-                                        </button>
-                                    )}
-
-                                    {user.resetStatus === 'requested' && (
-                                        <button
-                                            onClick={() => handleApproveReset(user.id)}
-                                            className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-sm hover:bg-amber-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
-                                        >
-                                            <ShieldAlert className="w-4 h-4" /> Enable Password Reset
-                                        </button>
-                                    )}
-
-                                    {user.status === 'active' && user.resetStatus !== 'requested' && (
-                                        <button
-                                            onClick={() => handleStatusUpdate(user.id, "banned")}
-                                            className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400 font-semibold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-all flex items-center justify-center gap-2 border border-red-200 dark:border-red-900/30 active:scale-95"
-                                        >
-                                            Ban User
-                                        </button>
-                                    )}
-
-                                    {user.status === 'banned' && (
-                                        <button
-                                            onClick={() => handleStatusUpdate(user.id, "active")}
-                                            className="flex-1 py-2.5 rounded-xl bg-white dark:bg-card border border-border text-foreground font-semibold text-sm hover:bg-muted transition-all flex items-center justify-center gap-2"
-                                        >
-                                            Unban
-                                        </button>
-                                    )}
-
-                                    {/* Delete Button (Available for all non-active or explicit cleanup) */}
-                                    <button
-                                        onClick={() => {
-                                            setUserToDelete(user.id)
-                                            setDeleteDialogOpen(true)
-                                        }}
-                                        className="w-10 flex items-center justify-center rounded-xl bg-muted/50 text-muted-foreground hover:bg-red-500/10 hover:text-red-600 transition-colors"
-                                        title="Delete User"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))
+                            {groupedUsers.other.length > 0 && (
+                                <AccordionItem value="other" className="border-none bg-muted/5 rounded-2xl mb-4 px-4 shadow-sm border border-border/50">
+                                    <AccordionTrigger className="hover:no-underline py-4">
+                                        <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                                            <User className="w-4 h-4" /> Unassigned Role ({groupedUsers.other.length})
+                                        </h2>
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <div className="space-y-3 pt-2">
+                                            {groupedUsers.other.map(renderUserCard)}
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            )}
+                        </Accordion>
                     )}
                 </div>
             </main>
@@ -356,6 +447,126 @@ export default function UserManagementPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+                <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto w-[90vw] rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Registration Details</DialogTitle>
+                        <DialogDescription>
+                            Review the full information provided by this user.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {detailsLoading ? (
+                        <div className="py-8 flex justify-center"><div className="w-8 h-8 rounded-full border-t-2 border-primary animate-spin" /></div>
+                    ) : selectedUserDetails ? (
+                        <div className="space-y-4">
+                            <div className="p-4 bg-muted/50 rounded-xl space-y-2">
+                                <p className="text-sm font-semibold">Contact Info</p>
+                                <p className="text-sm"><span className="text-muted-foreground mr-2">Name:</span> {selectedUserDetails.name || 'N/A'}</p>
+                                <p className="text-sm"><span className="text-muted-foreground mr-2">Phone:</span> {selectedUserDetails.phone}</p>
+                                <p className="text-sm"><span className="text-muted-foreground mr-2">Role:</span> <span className="uppercase font-bold">{selectedUserDetails.role}</span></p>
+                            </div>
+                            
+                            {selectedUserDetails.role === 'company' && selectedUserDetails.details && (
+                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                                    <div className="p-4 bg-muted/50 rounded-xl space-y-2 border border-border/50">
+                                        <p className="text-sm font-semibold pb-1 border-b border-border/50">Company Profile</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Company:</span> {selectedUserDetails.details.companyName || 'N/A'}</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Industry:</span> {selectedUserDetails.details.industryType || 'N/A'}</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Location:</span> {selectedUserDetails.details.address || 'N/A'}</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">GST IN:</span> <span className="uppercase font-mono text-xs bg-muted px-1 py-0.5 rounded">{selectedUserDetails.details.gstin || 'N/A'}</span></p>
+                                    </div>
+                                    <div className="p-4 bg-muted/50 rounded-xl space-y-2 border border-border/50">
+                                        <p className="text-sm font-semibold pb-1 border-b border-border/50">Point of Contact</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Name:</span> {selectedUserDetails.details.contactPerson || 'N/A'}</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Phone:</span> {selectedUserDetails.details.spokespersonPhone || 'N/A'}</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Email:</span> {selectedUserDetails.details.email || 'N/A'}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedUserDetails.role === 'technician' && selectedUserDetails.details && (
+                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                                    <div className="p-4 bg-muted/50 rounded-xl space-y-2 border border-border/50">
+                                        <p className="text-sm font-semibold pb-1 border-b border-border/50">Professional</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Experience:</span> {selectedUserDetails.details.experience || '0'} years</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Skill:</span> {selectedUserDetails.details.primarySkill || 'N/A'}</p>
+                                    </div>
+                                    <div className="p-4 bg-muted/50 rounded-xl space-y-2 border border-border/50">
+                                        <p className="text-sm font-semibold pb-1 border-b border-border/50">Personal</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">DOB:</span> {selectedUserDetails.details.dob ? new Date(selectedUserDetails.details.dob).toLocaleDateString() : 'N/A'}</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Gender:</span> {selectedUserDetails.details.gender || 'N/A'}</p>
+                                        <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Address:</span> {selectedUserDetails.details.address || 'N/A'}</p>
+                                    </div>
+                                    {selectedUserDetails.details.bankDetails && (
+                                        <div className="p-4 bg-muted/50 rounded-xl space-y-2 border border-border/50 bg-green-500/5 dark:bg-green-500/10">
+                                            <p className="text-sm font-semibold text-green-700 dark:text-green-500 pb-1 border-b border-green-500/20">Bank Details</p>
+                                            <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Bank:</span> {selectedUserDetails.details.bankDetails.bankName || 'N/A'}</p>
+                                            <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">Account:</span> {selectedUserDetails.details.bankDetails.accountNumber || 'N/A'}</p>
+                                            <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">IFSC:</span> <span className="uppercase font-mono text-xs bg-muted px-1 py-0.5 rounded">{selectedUserDetails.details.bankDetails.ifsc || 'N/A'}</span></p>
+                                            {selectedUserDetails.details.bankDetails.upi && (
+                                                <p className="text-sm"><span className="text-muted-foreground w-24 inline-block">UPI:</span> {selectedUserDetails.details.bankDetails.upi}</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {selectedUserDetails.details.documents && (
+                                        <div className="p-4 bg-muted/50 rounded-xl space-y-2 border border-border/50 group">
+                                            <p className="text-sm font-semibold pb-1 border-b border-border/50">Verification Documents</p>
+                                            <div className="grid grid-cols-1 gap-2 pt-1">
+                                                {selectedUserDetails.details.documents.aadharFront && (
+                                                    <a href={selectedUserDetails.details.documents.aadharFront} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+                                                        <Eye className="w-3 h-3" /> Aadhar Front
+                                                    </a>
+                                                )}
+                                                {selectedUserDetails.details.documents.aadharBack && (
+                                                    <a href={selectedUserDetails.details.documents.aadharBack} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+                                                        <Eye className="w-3 h-3" /> Aadhar Back
+                                                    </a>
+                                                )}                                                 {selectedUserDetails.details.documents.panCard && (
+                                                    <a href={selectedUserDetails.details.documents.panCard} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-bold">
+                                                        <Eye className="w-3 h-3" /> PAN Card Verified
+                                                    </a>
+                                                )}
+                                                {selectedUserDetails.details.documents.resume && (
+                                                    <a href={selectedUserDetails.details.documents.resume} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-bold">
+                                                        <Eye className="w-3 h-3" /> Resume / CV Attached
+                                                    </a>
+                                                )}
+                                                {selectedUserDetails.details.documents.profilePhoto && (
+                                                    <a href={selectedUserDetails.details.documents.profilePhoto} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-bold">
+                                                        <Eye className="w-3 h-3" /> Profile Photograph
+                                                    </a>
+                                                )}
+
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            
+                            {(selectedUserDetails.status === 'PENDING_APPROVAL' || selectedUserDetails.status === 'PENDING_PROFILE') && (
+                                <div className="flex gap-2 pt-4 border-t border-border/50 mt-4">
+                                    <button
+                                        onClick={() => { handleStatusUpdate(selectedUserDetails.id, "ACTIVE"); setDetailsOpen(false); }}
+                                        className="flex-1 py-3.5 rounded-xl bg-green-500 text-white font-bold text-sm hover:bg-green-600 transition-all shadow-lg shadow-green-500/20 active:scale-95 flex items-center justify-center gap-2"
+                                    >
+                                        <Check className="w-4 h-4" strokeWidth={3} /> Approve
+                                    </button>
+                                    <button
+                                        onClick={() => { handleStatusUpdate(selectedUserDetails.id, "REJECTED"); setDetailsOpen(false); }}
+                                        className="flex-1 py-3.5 rounded-xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400 font-bold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-all border border-red-200 dark:border-red-900/30 active:scale-95 flex items-center justify-center gap-2"
+                                    >
+                                        <X className="w-4 h-4" strokeWidth={3} /> Reject
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="py-8 text-center text-muted-foreground text-sm">No details found</div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             <BottomNav active="onboarding" role="admin" />
         </div >

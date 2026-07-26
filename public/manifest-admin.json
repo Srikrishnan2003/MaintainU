@@ -1,0 +1,9 @@
+{
+  "name": "MaintainU Admin",
+  "short_name": "MU Admin",
+  "start_url": "/admin-login",
+  "theme_color": "#1d4ed8",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+}

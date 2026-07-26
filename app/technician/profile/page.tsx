@@ -5,7 +5,6 @@ import { BiUser, BiCog, BiLogOut, BiChevronRight, BiMapPin, BiBriefcaseAlt, BiAw
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useEffect, useState } from "react"
-import { getTechnicianProfileAction, updateTechnicianProfileAction } from "@/lib/actions"
 import { api } from "@/lib/api"
 import {
     Dialog,
@@ -16,19 +15,25 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Loader2 } from "lucide-react"
+import { UploadButton } from "@/lib/uploadthing"
+
+let cachedProfile: any = null;
 
 export default function TechnicianProfile() {
     const router = useRouter()
-    const [profile, setProfile] = useState<any>(null)
-    const [loading, setLoading] = useState(true)
+    const [profile, setProfile] = useState<any>(cachedProfile)
+    const [loading, setLoading] = useState(!cachedProfile)
     const [isEditing, setIsEditing] = useState(false)
     const [editingData, setEditingData] = useState<any>({})
     const [updating, setUpdating] = useState(false)
+    const [photoUploading, setPhotoUploading] = useState(false)
 
     const fetchProfile = async () => {
         try {
-            const res = await getTechnicianProfileAction()
+            const res = await api.getTechnicianProfile()
             if (res.success) {
+                cachedProfile = res.data;
                 setProfile(res.data)
                 setEditingData({
                     name: res.data?.name,
@@ -37,13 +42,16 @@ export default function TechnicianProfile() {
                     experience: res.data?.experience,
                     dob: res.data?.dob,
                     gender: res.data?.gender,
+                    emergencyContactName: res.data?.emergencyContactName,
+                    emergencyContactPhone: res.data?.emergencyContactPhone,
+                    skills: res.data?.skills?.join(", "),
+                    preferredLocations: res.data?.preferredLocations?.join(", "),
                     dailyRate: res.data?.dailyRate,
-                    bankName: (res.data as any)?.bankDetails?.bankName,
-                    accountHolder: (res.data as any)?.bankDetails?.accountHolder,
-                    accountNumber: (res.data as any)?.bankDetails?.accountNumber,
-                    ifsc: (res.data as any)?.bankDetails?.ifsc,
-                    upi: (res.data as any)?.bankDetails?.upi,
-                    resume: (res.data as any)?.documents?.resume
+                    bankName: (res.data as unknown as { bankDetails?: Record<string, string> })?.bankDetails?.bankName,
+                    accountHolder: (res.data as unknown as { bankDetails?: Record<string, string> })?.bankDetails?.accountHolder,
+                    accountNumber: (res.data as unknown as { bankDetails?: Record<string, string> })?.bankDetails?.accountNumber,
+                    ifsc: (res.data as unknown as { bankDetails?: Record<string, string> })?.bankDetails?.ifsc,
+                    upi: (res.data as unknown as { bankDetails?: Record<string, string> })?.bankDetails?.upi
                 })
             } else {
                 toast.error("Failed to load profile")
@@ -67,13 +75,13 @@ export default function TechnicianProfile() {
     const handleUpdateProfile = async () => {
         setUpdating(true)
         try {
+            // TODO: resume upload to be added when document management is implemented
             const { bankName, accountHolder, accountNumber, ifsc, upi, resume, ...rest } = editingData
             const formattedData = {
                 ...rest,
-                resume,
                 bankDetails: { bankName, accountHolder, accountNumber, ifsc, upi }
             }
-            const res = await updateTechnicianProfileAction(formattedData)
+            const res = await api.updateTechnicianProfile(formattedData)
             if (res.success) {
                 toast.success("Profile updated")
                 setIsEditing(false)
@@ -95,10 +103,18 @@ export default function TechnicianProfile() {
         { icon: BiPhone, label: "Contact Phone", value: profile?.phone || "Not Set" },
     ]
 
+    if (profile?.emergencyContactName) {
+        menuItems.push({ icon: BiUser, label: "Emergency Contact", value: `${profile.emergencyContactName} (${profile.emergencyContactPhone || 'No Phone'})` })
+    }
+    
+    if (profile?.dailyRate) {
+        menuItems.push({ icon: BiAward, label: "Expected Daily Rate", value: `₹${profile.dailyRate}/day` })
+    }
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
         )
     }
@@ -109,18 +125,44 @@ export default function TechnicianProfile() {
             <div className="relative pt-10 pb-20 px-6 bg-gradient-to-br from-primary/20 via-primary/5 to-background border-b border-border/50 rounded-b-[3rem]">
                 <div className="mx-auto w-full max-w-md flex flex-col items-center text-center">
                     <div className="relative mb-4">
-                        <div className="w-28 h-28 rounded-full bg-white dark:bg-slate-800 shadow-2xl flex items-center justify-center ring-4 ring-white/50 dark:ring-white/10 p-1 relative">
-                            <BiUser className="w-12 h-12 text-primary" />
-                            <div className="absolute -bottom-1 -right-1 w-10 h-10 bg-yellow-400 rounded-full border-4 border-white dark:border-slate-800 flex items-center justify-center text-[10px] font-black text-yellow-900 shadow-sm">
-                                {profile?.rating && profile.rating > 0 ? profile.rating.toFixed(1) : "N/A"}
-                            </div>
+                        <div className="w-28 h-28 rounded-full bg-white dark:bg-slate-800 shadow-2xl flex items-center justify-center ring-4 ring-white/50 dark:ring-white/10 p-1 relative overflow-hidden">
+                            {(profile?.photo || profile?.documents?.photo) ? (
+                                <img 
+                                    src={profile.photo || profile.documents?.photo} 
+                                    alt={profile.name} 
+                                    className="w-full h-full object-cover rounded-full"
+                                />
+                            ) : (
+                                <BiUser className="w-12 h-12 text-primary" />
+                            )}
                         </div>
-                        <button
-                            onClick={() => setIsEditing(true)}
-                            className="absolute -top-1 -right-1 p-2 bg-primary text-white rounded-full shadow-lg hover:scale-110 transition-transform z-10"
-                        >
-                            <BiEdit className="w-4 h-4" />
-                        </button>
+                        <div className="absolute -top-1 -right-1 z-10 w-8 h-8 rounded-full bg-primary text-white shadow-lg hover:scale-110 transition-transform flex items-center justify-center overflow-hidden">
+                            {photoUploading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <>
+                                    <BiEdit className="w-4 h-4 absolute pointer-events-none" />
+                                    <div className="absolute inset-0 opacity-0 cursor-pointer">
+                                        <UploadButton
+                                            endpoint="technicianDocs"
+                                            onClientUploadComplete={async (res) => {
+                                                if (res?.[0]) {
+                                                    await api.updateTechnicianProfile({ photo: res[0].url });
+                                                    fetchProfile();
+                                                    toast.success("Profile photo updated");
+                                                }
+                                                setPhotoUploading(false);
+                                            }}
+                                            onUploadBegin={() => setPhotoUploading(true)}
+                                            onUploadError={(error: Error) => {
+                                                toast.error(`Upload failed: ${error.message}`);
+                                                setPhotoUploading(false);
+                                            }}
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                     <h1 className="text-2xl font-bold tracking-tight mb-1">{profile?.name || "Technician Name"}</h1>
                     <p className="text-sm text-muted-foreground font-medium bg-background/50 backdrop-blur px-3 py-1 rounded-full border border-border/50">
@@ -132,17 +174,25 @@ export default function TechnicianProfile() {
             {/* Menu Options */}
             <main className="px-6 -mt-10 space-y-5 mx-auto max-w-md relative z-10">
                 {/* Stats Row */}
-                {/* Stats Row */}
                 <section className="flex gap-3">
                     <div className="flex-1 glass-card p-4 rounded-2xl flex flex-col items-center justify-center text-center">
                         <p className="text-2xl font-bold text-primary">{profile?.completedJobs || 0}</p>
                         <p className="text-[10px] uppercase font-bold text-muted-foreground">Jobs Done</p>
                     </div>
-                    <div className="flex-1 glass-card p-4 rounded-2xl flex flex-col items-center justify-center text-center">
-                        <p className="text-2xl font-bold text-yellow-500">{profile?.rating ? Number(profile.rating).toFixed(1) : "N/A"}</p>
-                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Rating</p>
-                    </div>
                 </section>
+
+                {profile?.skills && profile.skills.length > 0 && (
+                    <section className="glass-card p-4 rounded-2xl">
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-3">Skills & Expertise</p>
+                        <div className="flex flex-wrap gap-2">
+                            {profile.skills.map((skill: string, idx: number) => (
+                                <span key={idx} className="px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full border border-primary/20">
+                                    {skill}
+                                </span>
+                            ))}
+                        </div>
+                    </section>
+                )}
 
                 {/* Info Card */}
                 <section className="glass-card rounded-3xl p-2 shadow-xl shadow-black/5 dark:shadow-black/20">
@@ -175,15 +225,29 @@ export default function TechnicianProfile() {
                         </div>
                         <BiChevronRight className="w-5 h-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
                     </button>
-                    <button className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors rounded-2xl group">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-slate-500/10 rounded-2xl text-slate-500 group-hover:text-foreground transition-colors">
+                    <div className="w-full flex flex-col p-4 bg-muted/20 rounded-2xl mt-2 border border-border/50">
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="p-3 bg-slate-500/10 rounded-2xl text-slate-500">
                                 <BiUser className="w-5 h-5" />
                             </div>
                             <span className="font-semibold text-sm">Privacy & Security</span>
                         </div>
-                        <BiChevronRight className="w-5 h-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-                    </button>
+                        <div className="space-y-3 pl-2">
+                            <div className="flex justify-between items-center pb-3 border-b border-border/40">
+                                <span className="text-sm text-muted-foreground">Phone Number</span>
+                                <div className="text-right">
+                                    <span className="text-sm font-medium">{profile?.phone || "Not Set"}</span>
+                                    <p className="text-[10px] text-muted-foreground opacity-70">To change, contact admin</p>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center pt-1">
+                                <span className="text-sm text-muted-foreground">Authentication</span>
+                                <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                                    Secure SMS OTP
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 {/* Logout */}
@@ -275,27 +339,67 @@ export default function TechnicianProfile() {
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="dailyRate">Daily Rate (₹)</Label>
-                            <Input
-                                id="dailyRate"
-                                type="number"
-                                value={editingData.dailyRate || ""}
-                                onChange={(e) => setEditingData({ ...editingData, dailyRate: parseInt(e.target.value) })}
-                                placeholder="800"
-                                className="rounded-xl"
-                            />
+                        <div className="pt-4 border-t border-border/50">
+                            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Emergency Contact</h3>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="emergencyContactName">Emergency Contact Name</Label>
+                                    <Input
+                                        id="emergencyContactName"
+                                        value={editingData.emergencyContactName || ""}
+                                        onChange={(e) => setEditingData({ ...editingData, emergencyContactName: e.target.value })}
+                                        placeholder="Name of contact"
+                                        className="rounded-xl"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="emergencyContactPhone">Emergency Contact Phone</Label>
+                                    <Input
+                                        id="emergencyContactPhone"
+                                        value={editingData.emergencyContactPhone || ""}
+                                        onChange={(e) => setEditingData({ ...editingData, emergencyContactPhone: e.target.value })}
+                                        placeholder="+91..."
+                                        className="rounded-xl"
+                                    />
+                                </div>
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="resume">Resume Link (Google Drive / LinkedIn)</Label>
-                            <Input
-                                id="resume"
-                                value={editingData.resume || ""}
-                                onChange={(e) => setEditingData({ ...editingData, resume: e.target.value })}
-                                placeholder="https://..."
-                                className="rounded-xl"
-                            />
-                            <p className="text-[10px] text-muted-foreground">Admin will verify this before approval.</p>
+
+                        <div className="pt-4 border-t border-border/50">
+                            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Work Preferences</h3>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="skills">Skills (Comma-separated)</Label>
+                                    <Input
+                                        id="skills"
+                                        value={editingData.skills || ""}
+                                        onChange={(e) => setEditingData({ ...editingData, skills: e.target.value })}
+                                        placeholder="E.g. ELECTRICAL, PLUMBING, HVAC"
+                                        className="rounded-xl"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="preferredLocations">Preferred Work Locations</Label>
+                                    <Input
+                                        id="preferredLocations"
+                                        value={editingData.preferredLocations || ""}
+                                        onChange={(e) => setEditingData({ ...editingData, preferredLocations: e.target.value })}
+                                        placeholder="Comma-separated locations"
+                                        className="rounded-xl"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="dailyRate">Expected Daily Rate (₹)</Label>
+                                    <Input
+                                        id="dailyRate"
+                                        type="number"
+                                        value={editingData.dailyRate || ""}
+                                        onChange={(e) => setEditingData({ ...editingData, dailyRate: e.target.value ? parseInt(e.target.value) : "" })}
+                                        placeholder="E.g. 1500"
+                                        className="rounded-xl"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         <div className="pt-4 border-t border-border/50">

@@ -115,7 +115,13 @@ export default function SignaturePage({ params }: { params: Promise<{ id: string
       const canvas = canvasRef.current
       const signature = canvas ? canvas.toDataURL() : ""
 
-      await api.completeJob(id, signature)
+      const res = await api.completeJob(id, signature)
+      
+      if (res && res.success === false) {
+        toast.error(res.message || "Failed to complete job");
+        return;
+      }
+
       toast.success("Job completed successfully!")
 
       // Navigate to completion success or back to dashboard
@@ -160,8 +166,8 @@ export default function SignaturePage({ params }: { params: Promise<{ id: string
               <CheckSquare className="w-6 h-6" />
             </div>
             <div>
-              <p className="font-black text-lg leading-tight">{job?.company || "ABC Industries"}</p>
-              <p className="text-[10px] font-black text-muted-foreground uppercase mt-1 tracking-tight">{job?.service || "Electrical Maintenance"}</p>
+              <p className="font-black text-lg leading-tight">{String(job?.company || "ABC Industries")}</p>
+              <p className="text-[10px] font-black text-muted-foreground uppercase mt-1 tracking-tight">{String(job?.service || "Electrical Maintenance")}</p>
             </div>
           </div>
           <div className="p-4 bg-muted/30 rounded-2xl border border-border/50">

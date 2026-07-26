@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Wrench, Loader2, MapPin, Briefcase, Star, Info, X, User, Plus } from "lucide-react"
-import { completeTechnicianProfileAction } from "@/lib/actions"
+import { completeTechnicianProfileAction } from "@/actions/technician.action"
 
 export default function TechnicianSetupPage() {
     const router = useRouter()
@@ -30,7 +30,11 @@ export default function TechnicianSetupPage() {
                 toast.success("Profile completed successfully!")
                 router.push("/technician/dashboard")
             } else {
-                toast.error(res?.message || "Failed to update profile")
+                if (res?.fieldErrors) {
+                    toast.error(`Validation Error: ${Object.values(res.fieldErrors).flat().join(", ")}`)
+                } else {
+                    toast.error(res?.message || "Failed to update profile")
+                }
             }
         } catch (error) {
             toast.error("An error occurred")

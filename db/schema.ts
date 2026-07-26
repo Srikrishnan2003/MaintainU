@@ -1,16 +1,22 @@
 
-import { pgTable, text, timestamp, uuid, boolean, pgEnum, integer, jsonb, date, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, boolean, pgEnum, integer, jsonb, date, doublePrecision, index, varchar } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["admin", "company", "technician"]);
-export const statusEnum = pgEnum("status", ["pending", "active", "banned", "rejected"]);
+export const statusEnum = pgEnum("status", ["PENDING_PROFILE", "PENDING_APPROVAL", "ACTIVE", "REJECTED"]);
 export const resetStatusEnum = pgEnum("reset_status", ["none", "requested", "approved"]);
 
 // Extended Status Enums based on Architecture
 export const requestStatusEnum = pgEnum("request_status", [
-    "Requested", "Reviewing", "Team_Forming", "Invites_Sent", "Team_Confirmed",
-    "Dispatched", "On_The_Way", "Arrived", "Work_Started", "In_Progress",
+    "Requested", "Reviewing", "Rejected", "Pending_Assign", "Team_Forming", 
+    "Assigned", "Declined", "Accepted", "Team_Confirmed",
+    "Dispatched", "On_The_Way", "Arrived", "In_Zone", "Exited_Zone", "Work_Started", "In_Progress",
+    "On_Hold", "Failed", "Timed_Out",
     "Work_Completed", "Sign_Pending", "Completed", "Invoiced", "Paid", "Cancelled"
 ]);
+
+export const serviceTypeEnum = pgEnum("service_type", ["ELECTRICAL", "PLUMBING", "HVAC", "MECHANICAL", "GENERAL"]);
+export const priorityEnum = pgEnum("priority", ["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
+export const simpleRequestStatusEnum = pgEnum("simple_request_status", ["REQUESTED", "ASSIGNED", "IN_PROGRESS", "COMPLETED"]);
 
 export const invoiceStatusEnum = pgEnum("invoice_status", ["Draft", "Sent", "Paid", "Overdue", "Cancelled"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["Initiated", "Authorized", "Captured", "Held", "Settled", "Disputed", "Refunded", "Released"]);
@@ -18,11 +24,11 @@ export const paymentStatusEnum = pgEnum("payment_status", ["Initiated", "Authori
 export const users = pgTable("users", {
     id: uuid("id").defaultRandom().primaryKey(),
     phone: text("phone").notNull().unique(),
-    passwordHash: text("password_hash"),
     role: roleEnum("role").notNull(),
-    status: statusEnum("status").default("pending").notNull(),
+    status: statusEnum("status").default("PENDING_PROFILE").notNull(),
     resetStatus: resetStatusEnum("reset_status").default("none").notNull(),
     name: text("name"),
+    passwordHash: varchar("password_hash", { length: 255 }), // bcrypt hash — nullable until password is set
     profileCompleted: boolean("profile_completed").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -72,7 +78,7 @@ export const technicians = pgTable("technicians", {
     documents: jsonb("documents"), // { photo, signature, resume, aadharFront, aadharBack, pan, etc }
 
     rating: doublePrecision("rating").default(0.0),
-    status: text("status").default("Pending"),
+    status: text("status").default("PENDING_PROFILE"),
     rejectionReason: text("rejection_reason"),
     approvedAt: timestamp("approved_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -82,25 +88,39 @@ export const technicians = pgTable("technicians", {
 export const requests = pgTable("requests", {
     id: uuid("id").defaultRandom().primaryKey(),
     companyId: uuid("company_id").references(() => companies.id).notNull(),
-    priority: text("priority").notNull(),
+    serviceType: text("service_type").notNull(), // stored as text in DB (e.g. "Electrical")
+    priority: text("priority").notNull(),         // stored as text in DB (e.g. "Normal", "Urgent")
+    location: text("location"),                      // nullable — not always provided at creation
     description: text("description").notNull(),
-    serviceType: text("service_type"), // E.g., Electrical, Mechanical
+    preferredDate: date("preferred_date"),            // nullable — kept for schema compat
+    preferredTimeSlot: text("preferred_time_slot"),  // nullable — kept for schema compat
 
-    // Location & Contact (Snapshot from Company profile or override)
-    locationAddress: text("location_address"),
-    latitude: doublePrecision("latitude"),
-    longitude: doublePrecision("longitude"),
-    supervisorName: text("supervisor_name"),
-    supervisorPhone: text("supervisor_phone"),
+    // ─── Fields used by the action layer ────────────────────────────
+    timeSlot: varchar("time_slot", { length: 100 }),             // e.g. "Morning", "9am-12pm"
+    supervisorName: varchar("supervisor_name", { length: 255 }), // on-site point of contact
+    supervisorPhone: varchar("supervisor_phone", { length: 20 }), // supervisor contact number
+    photos: text("photos").array(),                              // array of uploaded photo URLs
 
-    preferredDate: date("preferred_date"),
-    timeSlot: text("time_slot"),
-    photos: text("photos").array(),
+    // ─── Legacy columns — exist in DB, retained to prevent accidental drops ──
+    locationAddress: text("location_address"),                   // older address field
+    latitude: doublePrecision("latitude"),                        // geo coordinates
+    longitude: doublePrecision("longitude"),                      // geo coordinates
+    isRestrictedArea: boolean("is_restricted_area").default(false), // Zone Watch feature
+    estimatedZoneDuration: integer("estimated_zone_duration"),   // minutes, Zone Watch feature
+    rejectionReason: text("rejection_reason"),                   // why request was rejected
+    rejectedAt: timestamp("rejected_at"),                        // when rejected
+    assignmentAttempts: integer("assignment_attempts").default(0), // how many assign attempts
 
-    status: requestStatusEnum("status").default("Requested").notNull(),
+    status: text("status").default("Requested").notNull(), // text column in DB, validated by state-machine
+    technicianId: uuid("technician_id").references(() => technicians.id),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+    index("idx_requests_company_id").on(table.companyId),
+    index("idx_requests_status").on(table.status),
+]);
 
 // Jobs = Executed Requests
 export const jobs = pgTable("jobs", {
@@ -115,11 +135,36 @@ export const jobs = pgTable("jobs", {
     startedAt: timestamp("started_at"),
     completedAt: timestamp("completed_at"),
 
+    holdReason: text("hold_reason"),
+    failureReason: text("failure_reason"),
+    failedAt: timestamp("failed_at"),
+    reassignedFromId: uuid("reassigned_from_id"), // Self-reference to previous job if reassigned
+
     signatureUrl: text("signature_url"),
     supervisorSignName: text("supervisor_sign_name"),
 
+    assignedAt: timestamp("assigned_at"),
+    responseDeadline: timestamp("response_deadline"),
+    declineReason: text("decline_reason"),
+    declinedAt: timestamp("declined_at"),
+
+    enteredAreaAt: timestamp("entered_area_at"),
+    exitedAreaAt: timestamp("exited_area_at"),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const jobStatusHistory = pgTable("job_status_history", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobId: uuid("job_id").references(() => jobs.id).notNull(),
+    requestId: uuid("request_id").references(() => requests.id),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status").notNull(),
+    actorId: uuid("actor_id"), // ID of person who changed it
+    actorRole: text("actor_role"), // admin, company, technician
+    reason: text("reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const masterTeams = pgTable("master_teams", {
@@ -179,7 +224,7 @@ export const dailyAssignments = pgTable("daily_assignments", {
 
 export const attendance = pgTable("attendance", {
     id: uuid("id").defaultRandom().primaryKey(),
-    dailyAssignmentId: uuid("daily_assignment_id").references(() => dailyAssignments.id).notNull(),
+    dailyAssignmentId: uuid("daily_assignment_id").references(() => dailyAssignments.id),
     technicianId: uuid("technician_id").references(() => technicians.id).notNull(),
 
     status: text("status").default("Assigned"), // Assigned, Present, Absent, Substitute_Requested
@@ -289,3 +334,17 @@ export const notifications = pgTable("notifications", {
     isRead: boolean("is_read").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ─── OTP Verifications ──────────────────────────────────────────────
+export const otpVerifications = pgTable("otp_verifications", {
+    id:        uuid("id").defaultRandom().primaryKey(),
+    phone:     text("phone").notNull(),
+    otp:       text("otp").notNull(),           // SHA-256 hashed — NEVER plain text
+    expiresAt: timestamp("expires_at").notNull(),
+    attempts:  integer("attempts").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+    index("idx_otp_phone").on(table.phone),
+    index("idx_otp_expires_at").on(table.expiresAt),
+]);

@@ -3,7 +3,10 @@ import type { Metadata, Viewport } from "next"
 import { Outfit } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
-
+import { ThemeProvider } from "@/components/theme-provider"
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration"
+import { Toaster } from "@/components/ui/sonner"
+import QAToolbar from '@/components/qa/QAToolbar'
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-sans",
@@ -13,6 +16,12 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "MaintainU - Industrial Maintenance Platform",
   description: "Professional B2B maintenance management platform for companies and technicians",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "MaintainU",
+  },
   icons: {
     icon: [
       {
@@ -28,7 +37,7 @@ export const metadata: Metadata = {
         type: "image/svg+xml",
       },
     ],
-    apple: "/apple-icon.png",
+    apple: "/icons/icon-192.png",
   },
 }
 
@@ -37,12 +46,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#1e40af", // updated theme color for new palette
+  themeColor: "#000000",
 }
-
-import { ThemeProvider } from "@/components/theme-provider"
-
-// ... imports
 
 export default function RootLayout({
   children,
@@ -59,9 +64,13 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <Toaster />
+          <ServiceWorkerRegistration />
         </ThemeProvider>
         <Analytics />
+        {process.env.NODE_ENV === 'development' && <QAToolbar />}
       </body>
     </html>
   )
 }
+

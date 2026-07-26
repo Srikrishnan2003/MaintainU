@@ -7,6 +7,7 @@ import { useEffect, useState } from "react"
 import dynamic from 'next/dynamic'
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { api } from "@/lib/api"
+import { useSSE } from "@/hooks/use-sse"
 
 // Lazy Load Map Component
 const LocationMap = dynamic(() => import('@/components/admin/LocationMap'), {
@@ -38,6 +39,8 @@ export default function AdminLocationPage() {
     const [activeTechs, setActiveTechs] = useState<TechLocation[]>([])
     const [loadingConfig, setLoadingConfig] = useState(true)
     const [currentStyle, setCurrentStyle] = useState<"day" | "night" | "satellite">("day")
+
+    const { attendanceUpdates, fallbackMode } = useSSE(true)
 
     const mapStyles = {
         day: {
@@ -81,11 +84,57 @@ export default function AdminLocationPage() {
             }
         }
         fetchTechs()
-
-        // Poll every 10 seconds for live updates
-        const interval = setInterval(fetchTechs, 10000)
-        return () => clearInterval(interval)
     }, [])
+
+    useEffect(() => {
+        if (attendanceUpdates) {
+            const fetchTechs = async () => {
+                try {
+                    const res = await api.getTechnicians()
+                    if (res.technicians) {
+                        const mapped = res.technicians
+                            .filter((t: any) => t.lat && t.lng)
+                            .map((t: any) => ({
+                                id: t.id,
+                                name: t.name,
+                                lat: t.lat,
+                                lng: t.lng,
+                                status: "active" as "active",
+                                locationName: t.locationName || "Unknown"
+                            }))
+                        setActiveTechs(mapped)
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch locations", e)
+                }
+            }
+            fetchTechs()
+        }
+    }, [attendanceUpdates])
+
+    useEffect(() => {
+        if (!fallbackMode) return
+        const fetchTechs = async () => {
+            try {
+                const res = await api.getTechnicians()
+                if (res.technicians) {
+                    const mapped = res.technicians
+                        .filter((t: any) => t.lat && t.lng)
+                        .map((t: any) => ({
+                            id: t.id,
+                            name: t.name,
+                            lat: t.lat,
+                            lng: t.lng,
+                            status: "active" as "active",
+                            locationName: t.locationName || "Unknown"
+                        }))
+                    setActiveTechs(mapped)
+                }
+            } catch (e) {}
+        }
+        const interval = setInterval(fetchTechs, 30000)
+        return () => clearInterval(interval)
+    }, [fallbackMode])
 
     return (
         <div className="min-h-screen pb-32 app-gradient">
@@ -121,7 +170,7 @@ export default function AdminLocationPage() {
                             {Object.entries(mapStyles).map(([key, style]) => (
                                 <button
                                     key={key}
-                                    onClick={() => setCurrentStyle(key as any)}
+                                    onClick={() => setCurrentStyle(key as "day" | "night" | "satellite")}
                                     className={`p-2 rounded-lg transition-all flex items-center justify-center ${currentStyle === key ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
                                     title={style.name}
                                 >

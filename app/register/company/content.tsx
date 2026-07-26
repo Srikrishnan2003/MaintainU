@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { Loader2 } from "lucide-react"
 
 import { api } from "@/lib/api"
 import { toast } from "sonner"
@@ -23,6 +24,43 @@ export default function CompanyRegisterContent() {
     contactEmail: "",
   })
 
+  // Fetch existing data on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setIsLoading(true)
+      try {
+        const res = await api.refreshSession()
+        if (res.success) {
+          const profile = await api.getCompanyProfile()
+          if (profile.success && profile.data) {
+            const data = profile.data;
+            setFormData(prev => ({
+              ...prev,
+              companyName: data.companyName || "",
+              industry: data.industryType || "",
+              address: data.address || "",
+              gst: data.gstin || "",
+              email: data.email || "",
+              contactName: data.contactPerson || "",
+              contactPhone: data.spokespersonPhone || "",
+              contactEmail: data.email || ""
+            }))
+
+            // Determine starting step
+            // For companies, if they have Name and Address, skip to contact details?
+            if (!data.companyName || !data.address) setStep(1)
+            else setStep(2)
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load profile", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchProfile()
+  }, [])
+
   const handleNext = () => {
     if (step < 2) setStep(step + 1)
   }
@@ -32,8 +70,8 @@ export default function CompanyRegisterContent() {
     try {
       const res = await api.registerCompany({ phone, ...formData })
       if (res.success) {
-        toast.success("Registration successful!")
-        router.push("/onboarding/pending")
+        toast.success("Profile updated!")
+        router.push("/company/dashboard")
       }
     } catch (e) {
       toast.error("Registration failed")
@@ -43,7 +81,7 @@ export default function CompanyRegisterContent() {
   }
 
   return (
-    <div className="min-h-screen px-6 pt-6 pb-20 bg-background">
+    <div className="app-company min-h-screen px-6 pt-6 pb-20 bg-background">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Register Company</h1>
         <button onClick={() => router.back()} className="p-2 hover:bg-muted rounded-full transition-colors">
@@ -72,12 +110,16 @@ export default function CompanyRegisterContent() {
               onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
             />
             <div className="relative">
-              <select className="w-full px-4 py-3.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none font-medium">
-                <option>Select Industry</option>
-                <option>Manufacturing</option>
-                <option>Textile</option>
-                <option>Food & Beverage</option>
-                <option>Other</option>
+              <select 
+                value={formData.industry}
+                onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                className="w-full px-4 py-3.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none font-medium"
+              >
+                <option value="">Select Industry</option>
+                <option value="Manufacturing">Manufacturing</option>
+                <option value="Textile">Textile</option>
+                <option value="Food & Beverage">Food & Beverage</option>
+                <option value="Other">Other</option>
               </select>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
                 <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -158,10 +200,19 @@ export default function CompanyRegisterContent() {
             disabled={isLoading}
             className="flex-1 py-3.5 px-6 rounded-xl bg-primary text-primary-foreground font-bold hover:opacity-90 transition-all shadow-lg shadow-primary/20 flex items-center justify-center"
           >
-            {isLoading ? "Completing..." : "Complete Registration"}
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Complete Setup"}
           </button>
         )}
       </div>
+
+      {isLoading && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <p className="text-sm font-bold text-muted-foreground">Checking Profile Status...</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

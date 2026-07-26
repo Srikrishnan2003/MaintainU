@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Building2, Loader2, MapPin, User, FileText, Mail } from "lucide-react"
-import { completeCompanyProfileAction } from "@/lib/actions"
+import { completeCompanyProfileAction } from "@/actions/company.action"
 
 export default function CompanySetupPage() {
     const router = useRouter()
@@ -26,7 +26,11 @@ export default function CompanySetupPage() {
                 toast.success("Profile completed successfully!")
                 router.push("/company/dashboard")
             } else {
-                toast.error(res.message || "Failed to update profile")
+                if (res.fieldErrors) {
+                    toast.error(`Validation Error: ${Object.values(res.fieldErrors).flat().join(", ")}`)
+                } else {
+                    toast.error(res.message || "Failed to update profile")
+                }
             }
         } catch (error) {
             toast.error("An error occurred")

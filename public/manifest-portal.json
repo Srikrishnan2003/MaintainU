@@ -1,0 +1,9 @@
+{
+  "name": "MaintainU Portal",
+  "short_name": "MU Portal",
+  "start_url": "/company/login",
+  "theme_color": "#7c3aed",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+}
