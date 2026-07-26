@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { Briefcase, Wrench, ShieldCheck } from "lucide-react"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Logo } from "@/components/ui/logo"
@@ -11,6 +12,7 @@ export async function generateMetadata({
   const params = await searchParams
   if (params.role === "company") return { title: "MaintainU Portal" }
   if (params.role === "technician") return { title: "MaintainU Field" }
+  if (params.role === "admin") return { title: "MaintainU Admin" }
   return { title: "MaintainU" }
 }
 
@@ -20,16 +22,18 @@ export default async function OnboardingPage({
   searchParams: Promise<{ role?: string }>
 }) {
   const params = await searchParams
-  const role =
-    params.role === "company" || params.role === "technician"
-      ? params.role
-      : null
+  if (params.role !== "company" && params.role !== "technician" && params.role !== "admin") {
+    redirect("/onboarding?role=company")
+  }
+  const role = params.role
 
   const appClass =
     role === "company"
       ? "app-company"
       : role === "technician"
       ? "app-technician"
+      : role === "admin"
+      ? "app-admin"
       : ""
 
   const pageTitle =
@@ -37,6 +41,8 @@ export default async function OnboardingPage({
       ? "MaintainU Portal"
       : role === "technician"
       ? "MaintainU Field"
+      : role === "admin"
+      ? "MaintainU Admin"
       : "MaintainU"
 
   return (
@@ -55,11 +61,11 @@ export default async function OnboardingPage({
         {/* Role Selection */}
         <div className="space-y-4">
           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider text-center mb-4">
-            {role ? "Get Started" : "Choose your portal"}
+            Get Started
           </p>
 
           {/* Company Role Card */}
-          {(!role || role === "company") && (
+          {role === "company" && (
             <div className="p-5 rounded-2xl bg-white dark:bg-card border border-border hover:border-primary/50 hover:shadow-lg transition-all group relative overflow-hidden space-y-4">
               <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
               <div className="flex items-center gap-4 relative">
@@ -80,7 +86,7 @@ export default async function OnboardingPage({
                   Sign In
                 </Link>
                 <Link
-                  href="/register/company"
+                  href="/signup?role=company"
                   className="py-2.5 px-3 rounded-xl border border-border hover:border-primary/50 hover:bg-muted/50 font-bold text-sm transition-all text-center flex items-center justify-center text-foreground"
                 >
                   Register
@@ -90,7 +96,7 @@ export default async function OnboardingPage({
           )}
 
           {/* Technician Role Card */}
-          {(!role || role === "technician") && (
+          {role === "technician" && (
             <div className="p-5 rounded-2xl bg-white dark:bg-card border border-border hover:border-emerald-500/50 hover:shadow-lg transition-all group relative overflow-hidden space-y-4">
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
               <div className="flex items-center gap-4 relative">
@@ -111,7 +117,7 @@ export default async function OnboardingPage({
                   Sign In
                 </Link>
                 <Link
-                  href="/register/technician"
+                  href="/signup?role=technician"
                   className="py-2.5 px-3 rounded-xl border border-border hover:border-emerald-500/50 hover:bg-muted/50 font-bold text-sm transition-all text-center flex items-center justify-center text-foreground"
                 >
                   Register
@@ -119,20 +125,37 @@ export default async function OnboardingPage({
               </div>
             </div>
           )}
-        </div>
 
-        {/* Footer / Admin Link */}
-        {!role && (
-          <div className="pt-4 border-t border-border/50 flex flex-col items-center justify-center gap-3 text-center">
-            <Link
-              href="/admin-login"
-              className="text-xs text-muted-foreground hover:text-foreground font-semibold flex items-center gap-1.5 transition-colors"
-            >
-              <ShieldCheck className="w-4 h-4 text-primary" />
-              Admin Access
-            </Link>
-          </div>
-        )}
+          {/* Admin Role Card */}
+          {role === "admin" && (
+            <div className="p-5 rounded-2xl bg-white dark:bg-card border border-border hover:border-purple-500/50 hover:shadow-lg transition-all group relative overflow-hidden space-y-4">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+              <div className="flex items-center gap-4 relative">
+                <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform shrink-0">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold">Admin Portal</h2>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+                      Staff Only
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">System oversight & management</p>
+                </div>
+              </div>
+              <div className="pt-1 relative z-10">
+                <Link
+                  href="/admin-login"
+                  style={{ color: "var(--color-accent)" }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-purple-500/10 hover:bg-purple-600 hover:text-white font-bold text-sm transition-all text-center flex items-center justify-center gap-2"
+                >
+                  Log In to Admin
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

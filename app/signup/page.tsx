@@ -23,7 +23,7 @@ function SignupContent() {
   useEffect(() => {
     const roleParam = searchParams?.get("role")
     if (roleParam !== "company" && roleParam !== "technician") {
-      router.replace("/onboarding")
+      router.replace("/onboarding?role=company")
     }
   }, [searchParams, router])
 

@@ -5,7 +5,7 @@ export default async function RootPage() {
   const session = await getSession()
 
   if (!session) {
-    redirect('/onboarding')
+    redirect('/onboarding?role=company')
   }
 
   // Route authenticated users to their role dashboard
@@ -17,6 +17,6 @@ export default async function RootPage() {
     case 'technician':
       redirect('/technician/dashboard')
     default:
-      redirect('/onboarding')
+      redirect('/onboarding?role=company')
   }
 }
