@@ -64,7 +64,7 @@ export async function authenticateRequest(request: NextRequest) {
                 return NextResponse.redirect(new URL("/technician/pending", request.url));
             }
             if (status === "ACTIVE") {
-                if (pathname === "/technician/onboarding" || pathname === "/technician/pending") {
+                if (pathname === "/technician/onboarding" || pathname === "/technician/pending" || pathname === "/onboarding" || pathname === "/") {
                     return NextResponse.redirect(new URL("/technician/dashboard", request.url));
                 }
             }
@@ -75,9 +75,15 @@ export async function authenticateRequest(request: NextRequest) {
                 return NextResponse.redirect(new URL("/company/onboarding", request.url));
             }
             if (status === "ACTIVE") {
-                if (pathname === "/company/onboarding") {
+                if (pathname === "/company/onboarding" || pathname === "/onboarding" || pathname === "/") {
                     return NextResponse.redirect(new URL("/company/dashboard", request.url));
                 }
+            }
+        }
+
+        if (session.role === "admin") {
+            if (pathname === "/onboarding" || pathname === "/") {
+                return NextResponse.redirect(new URL("/admin/dashboard", request.url));
             }
         }
     }

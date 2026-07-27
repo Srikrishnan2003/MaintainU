@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { SessionPayload, signToken, verifyToken } from "@/lib/jwt";
 
 // ─── Constants ──────────────────────────────────────────────────────
@@ -20,7 +20,15 @@ export async function createSession(user: {
         ...(user.phone && { phone: user.phone }),
     };
 
-    const token = await signToken(payload, SESSION_EXPIRY_DAYS);
+    const headerStore = await headers();
+    const userAgent = headerStore.get("user-agent") || "";
+    // Android WebViews contain "; wv", and our Capacitor apps append "MaintainU-Mobile-App"
+    const isMobileApp = userAgent.includes("MaintainU-Mobile-App") || userAgent.includes("; wv") || userAgent.includes("Capacitor");
+
+    // Android mobile apps stay logged in indefinitely (10 years = 3650 days), while web browsers use 7 days
+    const expiryDays = isMobileApp ? 3650 : SESSION_EXPIRY_DAYS;
+
+    const token = await signToken(payload, expiryDays);
 
     const cookieStore = await cookies();
     cookieStore.set(COOKIE_NAME, token, {
@@ -28,7 +36,7 @@ export async function createSession(user: {
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
-        maxAge: SESSION_EXPIRY_DAYS * 24 * 60 * 60, // seconds
+        maxAge: expiryDays * 24 * 60 * 60, // seconds
     });
 
     // If admin, also set the admin flag cookie
@@ -38,7 +46,7 @@ export async function createSession(user: {
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
             path: "/",
-            maxAge: SESSION_EXPIRY_DAYS * 24 * 60 * 60,
+            maxAge: expiryDays * 24 * 60 * 60,
         });
     }
 }
