@@ -217,61 +217,69 @@ export default function UserManagementPage() {
                 >
                     <Eye className="w-4 h-4" strokeWidth={2.5} /> View Details
                 </button>
-                {(user.status === 'PENDING_APPROVAL' || user.status === 'PENDING_PROFILE') && (
+                {user.role === 'admin' ? (
+                    <div className="flex-1 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 font-semibold text-xs flex items-center justify-center gap-2">
+                        <ShieldAlert className="w-4 h-4" /> Protected Admin Account
+                    </div>
+                ) : (
                     <>
+                        {(user.status === 'PENDING_APPROVAL' || user.status === 'PENDING_PROFILE') && (
+                            <>
+                                <button
+                                    onClick={() => handleStatusUpdate(user.id, "ACTIVE")}
+                                    className="flex-1 py-2.5 rounded-xl bg-green-500 text-white font-semibold text-sm hover:bg-green-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 active:scale-95"
+                                >
+                                    <Check className="w-4 h-4" strokeWidth={2.5} /> Approve
+                                </button>
+                                <button
+                                    onClick={() => handleStatusUpdate(user.id, "REJECTED")}
+                                    className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400 font-semibold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-all flex items-center justify-center gap-2 border border-red-200 dark:border-red-900/30 active:scale-95"
+                                >
+                                    <X className="w-4 h-4" strokeWidth={2.5} /> Reject
+                                </button>
+                            </>
+                        )}
+
+                        {user.status === 'REJECTED' && (
+                            <button
+                                onClick={() => handleStatusUpdate(user.id, "ACTIVE")}
+                                className="flex-1 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                            >
+                                <RotateCcw className="w-4 h-4" /> Re-admit / Approve
+                            </button>
+                        )}
+
+                        {user.status === 'ACTIVE' && (
+                            <button
+                                onClick={() => handleStatusUpdate(user.id, "REJECTED")}
+                                className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400 font-semibold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-all flex items-center justify-center gap-2 border border-red-200 dark:border-red-900/30 active:scale-95"
+                            >
+                                Ban User
+                            </button>
+                        )}
+
+                        {user.status === 'REJECTED' && (
+                            <button
+                                onClick={() => handleStatusUpdate(user.id, "ACTIVE")}
+                                className="flex-1 py-2.5 rounded-xl bg-white dark:bg-card border border-border text-foreground font-semibold text-sm hover:bg-muted transition-all flex items-center justify-center gap-2"
+                            >
+                                Unban
+                            </button>
+                        )}
+
+                        {/* Delete Button (Available for all non-active or explicit cleanup) */}
                         <button
-                            onClick={() => handleStatusUpdate(user.id, "ACTIVE")}
-                            className="flex-1 py-2.5 rounded-xl bg-green-500 text-white font-semibold text-sm hover:bg-green-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 active:scale-95"
+                            onClick={() => {
+                                setUserToDelete(user.id)
+                                setDeleteDialogOpen(true)
+                            }}
+                            className="w-10 flex items-center justify-center rounded-xl bg-muted/50 text-muted-foreground hover:bg-red-500/10 hover:text-red-600 transition-colors"
+                            title="Delete User"
                         >
-                            <Check className="w-4 h-4" strokeWidth={2.5} /> Approve
-                        </button>
-                        <button
-                            onClick={() => handleStatusUpdate(user.id, "REJECTED")}
-                            className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400 font-semibold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-all flex items-center justify-center gap-2 border border-red-200 dark:border-red-900/30 active:scale-95"
-                        >
-                            <X className="w-4 h-4" strokeWidth={2.5} /> Reject
+                            <Trash2 className="w-4 h-4" />
                         </button>
                     </>
                 )}
-
-                {user.status === 'REJECTED' && (
-                    <button
-                        onClick={() => handleStatusUpdate(user.id, "ACTIVE")}
-                        className="flex-1 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-                    >
-                        <RotateCcw className="w-4 h-4" /> Re-admit / Approve
-                    </button>
-                )}
-
-                {user.status === 'ACTIVE' && (
-                    <button
-                        onClick={() => handleStatusUpdate(user.id, "REJECTED")}
-                        className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400 font-semibold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-all flex items-center justify-center gap-2 border border-red-200 dark:border-red-900/30 active:scale-95"
-                    >
-                        Ban User
-                    </button>
-                )}
-
-                {user.status === 'REJECTED' && (
-                    <button
-                        onClick={() => handleStatusUpdate(user.id, "ACTIVE")}
-                        className="flex-1 py-2.5 rounded-xl bg-white dark:bg-card border border-border text-foreground font-semibold text-sm hover:bg-muted transition-all flex items-center justify-center gap-2"
-                    >
-                        Unban
-                    </button>
-                )}
-
-                {/* Delete Button (Available for all non-active or explicit cleanup) */}
-                <button
-                    onClick={() => {
-                        setUserToDelete(user.id)
-                        setDeleteDialogOpen(true)
-                    }}
-                    className="w-10 flex items-center justify-center rounded-xl bg-muted/50 text-muted-foreground hover:bg-red-500/10 hover:text-red-600 transition-colors"
-                    title="Delete User"
-                >
-                    <Trash2 className="w-4 h-4" />
-                </button>
             </div>
         </div>
     )
@@ -545,7 +553,7 @@ export default function UserManagementPage() {
                                 </div>
                             )}
                             
-                            {(selectedUserDetails.status === 'PENDING_APPROVAL' || selectedUserDetails.status === 'PENDING_PROFILE') && (
+                            {(selectedUserDetails.status === 'PENDING_APPROVAL' || selectedUserDetails.status === 'PENDING_PROFILE') && selectedUserDetails.role !== 'admin' && (
                                 <div className="flex gap-2 pt-4 border-t border-border/50 mt-4">
                                     <button
                                         onClick={() => { handleStatusUpdate(selectedUserDetails.id, "ACTIVE"); setDetailsOpen(false); }}

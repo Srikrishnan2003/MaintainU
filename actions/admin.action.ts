@@ -268,6 +268,11 @@ export async function updateUserStatusAction(userId: string, status: any, role?:
     try {
         await requireRole("admin");
 
+        const [targetUser] = await db.select().from(users).where(eq(users.id, userId));
+        if (targetUser && targetUser.role === "admin" && validatedData.status === "REJECTED") {
+            return { success: false, message: "Admin accounts cannot be banned or rejected." };
+        }
+
         await db.update(users)
             .set({ 
                 status: validatedData.status as "PENDING_PROFILE" | "PENDING_APPROVAL" | "ACTIVE" | "REJECTED", 
@@ -505,6 +510,11 @@ export async function adminLoginAction(phone: string, inputPass: string): Promis
 export async function deleteUserAction(userId: string) {
     try {
         await requireRole("admin");
+
+        const [targetUser] = await db.select().from(users).where(eq(users.id, userId));
+        if (targetUser && targetUser.role === "admin") {
+            return { success: false, message: "Admin accounts cannot be deleted." };
+        }
 
         // Sequential deletes required — companies/technicians FK reference users.id
         await db.delete(companies).where(eq(companies.userId, userId));
