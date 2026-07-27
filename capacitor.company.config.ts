@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'MaintainU Company',
   webDir: 'public',
   server: {
-    url: 'https://REPLACE_WITH_VERCEL_URL/onboarding?role=company',
+    url: 'https://maintainu-app.vercel.app/onboarding?role=company',
     cleartext: false
   }
 };
