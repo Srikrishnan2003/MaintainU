@@ -5,9 +5,32 @@ import { verifyToken } from "@/lib/jwt";
 
 const f = createUploadthing();
 
-const authMiddleware = async () => {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("session_token")?.value;
+const authMiddleware = async ({ req }: { req: Request }) => {
+    // 1. Try NextRequest cookies method if available
+    let token = (req as any).cookies?.get?.("session_token")?.value;
+
+    // 2. Fallback to standard Request cookie header parsing
+    if (!token) {
+        const cookieHeader = req.headers.get("cookie");
+        if (cookieHeader) {
+            const cookiesObj = cookieHeader.split("; ").reduce((acc, current) => {
+                const [name, ...value] = current.split("=");
+                acc[name] = value.join("=");
+                return acc;
+            }, {} as Record<string, string>);
+            token = cookiesObj["session_token"];
+        }
+    }
+
+    // 3. Fallback to next/headers cookies()
+    if (!token) {
+        try {
+            const cookieStore = await cookies();
+            token = cookieStore.get("session_token")?.value;
+        } catch (e) {
+            // ignore
+        }
+    }
     
     if (!token) throw new UploadThingError("Unauthorized");
     
