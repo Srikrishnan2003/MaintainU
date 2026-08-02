@@ -106,6 +106,8 @@ export async function sendOTP(phoneInput: string, inputRole?: "company" | "techn
                     gender: details?.gender,
                     address: details?.address,
                     experience: details?.experience ? Number(details.experience) : undefined,
+                    experienceLevel: details?.experienceLevel,
+                    skills: details?.skills || [],
                     primarySkill: details?.primarySkill,
                 };
                 await db.insert(technicians).values(techInsert);

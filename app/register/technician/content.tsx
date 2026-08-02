@@ -8,6 +8,20 @@ import { api } from "@/lib/api"
 import { toast } from "sonner"
 import { UploadButton } from "@/lib/uploadthing"
 
+const tradeSpecializations: Record<string, string[]> = {
+  "Electrical": ["High Voltage", "Panel Wiring", "Appliance Repair", "Lighting", "Troubleshooting"],
+  "Mechanical": ["Heavy Machinery", "Welding", "Automotive", "Pumps/Motors", "Conveyors"],
+  "HVAC": ["AC Installation", "Heating Systems", "Ductwork", "Refrigeration", "Maintenance"],
+  "Plumbing": ["Piping", "Drain Cleaning", "Water Heaters", "Leak Detection", "Commercial"],
+  "Assembly": ["Furniture", "Electronics", "Industrial", "Quality Control"],
+};
+
+const experienceLevels = [
+  { value: "Apprentice", label: "Apprentice", desc: "0-2 Yrs" },
+  { value: "Journeyman", label: "Journeyman", desc: "3-5 Yrs" },
+  { value: "Master", label: "Master", desc: "5+ Yrs" }
+];
+
 export default function TechnicianRegisterContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -21,6 +35,8 @@ export default function TechnicianRegisterContent() {
     gender: "",
     address: "",
     experience: "",
+    experienceLevel: "",
+    skills: [] as string[],
     primarySkill: "",
     aadharFront: "",
     aadharBack: "",
@@ -54,6 +70,8 @@ export default function TechnicianRegisterContent() {
               gender: data.gender || "",
               address: data.address || "",
               experience: data.experience?.toString() || "",
+              experienceLevel: data.experienceLevel || "",
+              skills: data.skills || [],
               primarySkill: data.primarySkill || "",
               aadharFront: docs.aadharFront || "",
               aadharBack: docs.aadharBack || "",
@@ -171,34 +189,79 @@ export default function TechnicianRegisterContent() {
       )}
 
       {step === 2 && (
-        <div className="space-y-4 mb-8 animate-in slide-in-from-right-4 fade-in duration-300">
+        <div className="space-y-6 mb-8 animate-in slide-in-from-right-4 fade-in duration-300">
           <h2 className="text-lg font-bold text-foreground">Professional Details</h2>
-          <div className="space-y-4">
+          
+          <div className="space-y-3">
+            <label className="text-sm font-bold text-foreground">Experience Level</label>
+            <div className="grid grid-cols-3 gap-2">
+              {experienceLevels.map(level => (
+                <button
+                  key={level.value}
+                  onClick={() => setFormData({ ...formData, experienceLevel: level.value })}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${formData.experienceLevel === level.value ? "bg-primary text-primary-foreground border-primary shadow-md" : "bg-card border-border text-foreground hover:bg-muted"}`}
+                >
+                  <span className="font-bold text-sm">{level.label}</span>
+                  <span className={`text-[10px] mt-1 ${formData.experienceLevel === level.value ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{level.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-sm font-bold text-foreground">Years of Experience</label>
             <input
               type="number"
-              placeholder="Years of Experience"
+              placeholder="e.g. 4"
               className="w-full px-4 py-3.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
               value={formData.experience}
               onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
             />
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-sm font-bold text-foreground">Primary Trade</label>
             <div className="relative">
               <select
                 className="w-full px-4 py-3.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none font-medium"
                 value={formData.primarySkill}
-                onChange={(e) => setFormData({ ...formData, primarySkill: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, primarySkill: e.target.value, skills: [] })}
               >
-                <option>Select Primary Skill</option>
-                <option>Electrical</option>
-                <option>Mechanical</option>
-                <option>HVAC</option>
-                <option>Plumbing</option>
-                <option>Assembly</option>
+                <option value="">Select Primary Skill</option>
+                <option value="Electrical">Electrical</option>
+                <option value="Mechanical">Mechanical</option>
+                <option value="HVAC">HVAC</option>
+                <option value="Plumbing">Plumbing</option>
+                <option value="Assembly">Assembly</option>
               </select>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
                 <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </div>
             </div>
           </div>
+
+          {formData.primarySkill && tradeSpecializations[formData.primarySkill] && (
+            <div className="space-y-3 animate-in fade-in zoom-in duration-300">
+              <label className="text-sm font-bold text-foreground">Specializations</label>
+              <div className="flex flex-wrap gap-2">
+                {tradeSpecializations[formData.primarySkill].map(skill => (
+                  <button
+                    key={skill}
+                    onClick={() => {
+                      const newSkills = formData.skills.includes(skill)
+                        ? formData.skills.filter(s => s !== skill)
+                        : [...formData.skills, skill];
+                      setFormData({ ...formData, skills: newSkills });
+                    }}
+                    className={`px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${formData.skills.includes(skill) ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-card border-border text-foreground hover:bg-muted"}`}
+                  >
+                    {skill}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 

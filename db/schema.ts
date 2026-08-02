@@ -66,6 +66,7 @@ export const technicians = pgTable("technicians", {
 
     // Professional Details
     experience: integer("experience"),
+    experienceLevel: text("experience_level"),
     skills: text("skills").array(),
     primarySkill: text("primary_skill"),
     dailyRate: integer("daily_rate"),

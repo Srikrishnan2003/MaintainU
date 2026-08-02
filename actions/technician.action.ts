@@ -15,6 +15,8 @@ const onboardingSchema = z.object({
   gender: z.string().min(1, "Gender is required"),
   address: z.string().min(10, "Please provide a complete address"),
   experience: z.coerce.number().min(0, "Experience cannot be negative"),
+  experienceLevel: z.string().optional(),
+  skills: z.array(z.string()).optional(),
   primarySkill: z.string().min(1, "Primary skill is required"),
   documents: z.object({
      profilePhoto: z.string().url("Profile photo is required"),
@@ -144,6 +146,7 @@ export async function updateTechnicianProfileAction(data: any): Promise<ActionRe
             .set({ 
                 primarySkill: validatedData.primarySkill, 
                 experience: validatedData.experience ? Number(validatedData.experience) : undefined, 
+                experienceLevel: validatedData.experienceLevel,
                 address: validatedData.address,
                 emergencyContactName: validatedData.emergencyContactName,
                 emergencyContactPhone: validatedData.emergencyContactPhone,
@@ -314,6 +317,7 @@ export async function completeTechnicianProfileAction(data: any): Promise<Action
 
         await db.update(technicians).set({
             experience: validatedData.experience ? Number(validatedData.experience) : undefined,
+            experienceLevel: validatedData.experienceLevel,
             primarySkill: validatedData.primarySkill,
             skills: skillsArray,
             address: validatedData.address,

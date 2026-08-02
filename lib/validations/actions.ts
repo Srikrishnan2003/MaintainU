@@ -65,11 +65,12 @@ export const technicianProfileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").optional(),
   phone: z.string().regex(phoneRegex, "Invalid Indian phone number").optional(),
   skills: z.union([
-    z.array(z.enum(serviceTypes)),
+    z.array(z.string()),
     z.string().transform((val) => val.split(",").map(s => s.trim()).filter(Boolean) as string[])
   ]).optional(),
-  primarySkill: z.enum(serviceTypes).optional(),
+  primarySkill: z.string().optional(),
   experience: z.union([z.string(), z.number()]).optional(),
+  experienceLevel: z.string().optional(),
   bio: z.string().max(500, "Bio cannot exceed 500 characters").optional(),
   address: z.string().min(5, "Address must be at least 5 characters").optional(),
 });
