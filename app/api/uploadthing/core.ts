@@ -61,8 +61,7 @@ export const ourFileRouter = {
     }),
 
   technicianDocs: f({ 
-        image: { maxFileSize: "4MB", maxFileCount: 1 },
-        pdf: { maxFileSize: "4MB", maxFileCount: 1 }
+        blob: { maxFileSize: "8MB", maxFileCount: 1 }
     })
     .middleware(authMiddleware)
     .onUploadComplete(async ({ metadata, file }) => {

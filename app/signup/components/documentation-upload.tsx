@@ -16,10 +16,10 @@ export interface DocConfig {
 }
 
 export const DOCUMENTS_CONFIG: DocConfig[] = [
-  { id: "photo", title: "Profile photo", type: "image", maxSizeMB: 2, icon: User, group: "general" },
-  { id: "resume", title: "Resume / CV", type: "pdf", maxSizeMB: 4, icon: FileText, group: "general" },
-  { id: "eAadhaar", title: "e-Aadhaar", type: "imageOrPdf", maxSizeMB: 4, icon: IdCard, group: "identity" },
-  { id: "ePan", title: "e-PAN", type: "imageOrPdf", maxSizeMB: 4, icon: IdCard, group: "identity" },
+  { id: "photo", title: "Profile photo", type: "image", maxSizeMB: 8, icon: User, group: "general" },
+  { id: "resume", title: "Resume / CV", type: "pdf", maxSizeMB: 8, icon: FileText, group: "general" },
+  { id: "eAadhaar", title: "e-Aadhaar", type: "imageOrPdf", maxSizeMB: 8, icon: IdCard, group: "identity" },
+  { id: "ePan", title: "e-PAN", type: "imageOrPdf", maxSizeMB: 8, icon: IdCard, group: "identity" },
 ]
 
 type DocState = 
