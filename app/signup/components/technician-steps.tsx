@@ -2,7 +2,7 @@ import { ArrowRight, Loader2, Home, CheckCircle2, FileText } from "lucide-react"
 import { UploadButton } from "@/lib/uploadthing"
 import { toast } from "sonner"
 import { Step, SignupFormData } from "../types"
-
+import { DocumentationUpload } from "./documentation-upload"
 interface StepProps {
   formData: SignupFormData;
   updateData: (data: Partial<SignupFormData>) => void;
@@ -167,111 +167,22 @@ export function TechnicianStep2({ formData, updateData, setStep }: StepProps) {
   )
 }
 
-export function TechnicianStep3({ formData, updateData, setStep }: StepProps) {
+export function TechnicianStep3({ formData, updateData, setStep, isLoading }: StepProps) {
   return (
-    <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Profile Photo */}
-        <div className="p-4 rounded-2xl border border-dashed border-border bg-card/30 flex flex-col items-center gap-3 transition-all hover:bg-card/50">
-          <div className="flex flex-col items-center">
-             <span className="text-[10px] font-black uppercase text-muted-foreground">Profile Photo</span>
-             <span className="text-[9px] text-muted-foreground/60 font-medium">Image • Max 2MB</span>
-          </div>
-          {formData.photo ? (
-            <img src={formData.photo} className="w-14 h-14 rounded-full object-cover border-2 border-primary shadow-sm" alt="Profile" />
-          ) : (
-            <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground/40 border border-border">
-              <Home className="w-6 h-6" />
-            </div>
-          )}
-          <UploadButton
-            endpoint="technicianDocs"
-            onClientUploadComplete={(res) => {
-              updateData({ photo: res[0].url })
-              toast.success("Profile photo uploaded successfully")
-            }}
-            onUploadError={(error) => {
-              toast.error(`Photo Error: ${error.message}`)
-            }}
-            content={{ button: () => formData.photo ? "Update Photo" : "Upload Photo" }}
-            appearance={{
-              button: `w-full h-9 text-[11px] font-bold rounded-xl transition-all shadow-sm ${formData.photo ? 'bg-green-600 hover:bg-green-700' : 'bg-primary hover:bg-primary/90'}`,
-              allowedContent: "hidden"
-            }}
-          />
-        </div>
-
-        {/* Resume */}
-        <div className="p-4 rounded-2xl border border-dashed border-border bg-card/30 flex flex-col items-center gap-3 transition-all hover:bg-card/50">
-          <div className="flex flex-col items-center">
-             <span className="text-[10px] font-black uppercase text-muted-foreground">Resume / CV</span>
-             <span className="text-[9px] text-muted-foreground/60 font-medium">PDF Only • Max 4MB</span>
-          </div>
-          {formData.resume ? (
-            <div className="w-14 h-14 rounded-xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-          ) : (
-            <div className="w-14 h-14 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground/40 border border-border">
-              <FileText className="w-6 h-6" />
-            </div>
-          )}
-          <UploadButton
-            endpoint="technicianDocs"
-            onClientUploadComplete={(res) => {
-              updateData({ resume: res[0].url })
-              toast.success("Resume uploaded successfully")
-            }}
-            onUploadError={(error) => {
-              toast.error(`Resume Error: ${error.message}`)
-            }}
-            content={{ button: () => formData.resume ? "Update PDF" : "Upload PDF" }}
-            appearance={{
-              button: `w-full h-9 text-[11px] font-bold rounded-xl transition-all shadow-sm ${formData.resume ? 'bg-green-600 hover:bg-green-700' : 'bg-primary hover:bg-primary/90'}`,
-              allowedContent: "hidden"
-            }}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {[
-          { label: "Aadhaar (Front)", state: formData.aadharFront, setter: (url: string) => updateData({ aadharFront: url }), type: "Image • Max 2MB" },
-          { label: "Aadhaar (Back)", state: formData.aadharBack, setter: (url: string) => updateData({ aadharBack: url }), type: "Image • Max 2MB" },
-          { label: "PAN", state: formData.panCard, setter: (url: string) => updateData({ panCard: url }), type: "Image • Max 2MB" }
-        ].map((doc, idx) => (
-          <div key={idx} className="p-3.5 rounded-2xl border border-border bg-white dark:bg-card/50 flex items-center justify-between gap-4 transition-all hover:border-primary/30">
-            <div className="flex flex-col">
-              <label className="text-xs font-bold text-foreground">{doc.label}</label>
-              <span className="text-[9px] text-muted-foreground/70 font-medium">{doc.type}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              {doc.state && <img src={doc.state} className="w-10 h-6 rounded-md object-cover border border-border shadow-sm" alt="Doc" />}
-              <UploadButton
-                endpoint="technicianDocs"
-                onClientUploadComplete={(res) => {
-                  doc.setter(res[0].url)
-                  toast.success(`${doc.label} uploaded`)
-                }}
-                onUploadError={(error) => {
-                  toast.error(`${doc.label} Error: ${error.message}`)
-                }}
-                content={{ button: () => doc.state ? "Update" : "Upload" }}
-                appearance={{
-                  button: `h-8 px-4 text-[10px] font-bold rounded-lg transition-all shadow-sm ${doc.state ? 'bg-green-600 hover:bg-green-700' : 'bg-primary hover:bg-primary/90'}`,
-                  allowedContent: "hidden"
-                }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-3">
-        <button onClick={() => setStep("details-tech-2")} className="flex-1 py-4 rounded-xl border border-border font-bold">Back</button>
-        <button onClick={() => setStep("verify-required")} className="flex-[2] py-4 rounded-xl bg-primary text-white font-bold flex items-center justify-center gap-2">
-          Review <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
+    <DocumentationUpload
+      initialData={{
+        photo: formData.photo,
+        resume: formData.resume,
+        aadharFront: formData.aadharFront,
+        aadharBack: formData.aadharBack,
+        panCard: formData.panCard,
+      }}
+      onBack={() => setStep("details-tech-2")}
+      onSubmit={(data) => {
+        updateData(data)
+        setStep("verify-required")
+      }}
+      isSubmitting={isLoading}
+    />
   )
 }
