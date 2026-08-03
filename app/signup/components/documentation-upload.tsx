@@ -96,7 +96,14 @@ export function DocumentationUpload({ initialData, onBack, onSubmit, isSubmittin
     setDocStates(prev => ({ ...prev, [docId]: { status: "uploading" } }))
 
     try {
-      const res = await startUpload([file])
+      // Mobile WebView cameras sometimes capture files without extensions
+      let fileToUpload = file;
+      if (!file.name.includes('.')) {
+        const ext = file.type.split('/')[1] || 'jpeg';
+        fileToUpload = new File([file], `${file.name || 'upload'}.${ext}`, { type: file.type });
+      }
+
+      const res = await startUpload([fileToUpload])
       if (res && res[0]) {
         setDocStates(prev => ({ ...prev, [docId]: { status: "uploaded", url: res[0].url, filename: file.name } }))
       } else {

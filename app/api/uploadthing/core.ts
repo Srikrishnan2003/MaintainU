@@ -9,20 +9,7 @@ const authMiddleware = async ({ req }: { req: Request }) => {
     // 1. Try NextRequest cookies method if available
     let token = (req as any).cookies?.get?.("session_token")?.value;
 
-    // 2. Fallback to standard Request cookie header parsing
-    if (!token) {
-        const cookieHeader = req.headers.get("cookie");
-        if (cookieHeader) {
-            const cookiesObj = cookieHeader.split("; ").reduce((acc, current) => {
-                const [name, ...value] = current.split("=");
-                acc[name] = value.join("=");
-                return acc;
-            }, {} as Record<string, string>);
-            token = cookiesObj["session_token"];
-        }
-    }
-
-    // 3. Fallback to next/headers cookies()
+    // 2. Fallback to next/headers cookies()
     if (!token) {
         try {
             const cookieStore = await cookies();
@@ -32,10 +19,16 @@ const authMiddleware = async ({ req }: { req: Request }) => {
         }
     }
     
-    if (!token) throw new UploadThingError("Unauthorized");
+    if (!token) {
+        console.error("UploadThing Auth Error: No token found");
+        throw new UploadThingError({ code: "UNAUTHORIZED", message: "Unauthorized: Missing session token" });
+    }
     
     const payload = await verifyToken(token);
-    if (!payload || !payload.userId) throw new UploadThingError("Invalid token");
+    if (!payload || !payload.userId) {
+        console.error("UploadThing Auth Error: Invalid token");
+        throw new UploadThingError({ code: "UNAUTHORIZED", message: "Unauthorized: Invalid session token" });
+    }
     
     return { userId: payload.userId, role: payload.role };
 };
