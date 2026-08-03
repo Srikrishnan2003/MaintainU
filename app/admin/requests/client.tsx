@@ -14,6 +14,12 @@ import { toast } from "sonner"
 import { useSSE } from "@/hooks/use-sse"
 import { useSliceRefetch } from "@/hooks/use-slice-refetch"
 import { getRequestsAction } from "@/actions/admin.action"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
 
 export default function AdminRequestsClient({ 
     initialRequests, 
@@ -29,6 +35,10 @@ export default function AdminRequestsClient({
     const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
     const [deleteWarning, setDeleteWarning] = useState<any>(null)
     const [isDeleting, setIsDeleting] = useState(false)
+    
+    const [editingRequest, setEditingRequest] = useState<any>(null)
+    const [editFormData, setEditFormData] = useState<any>({})
+    const [isSavingEdit, setIsSavingEdit] = useState(false)
 
     const { jobUpdates, isConnected, fallbackMode } = useSSE(true)
     const { refetch } = useSliceRefetch()
@@ -43,6 +53,39 @@ export default function AdminRequestsClient({
         }
         refetch(() => getRequestsAction(filters), (data: any) => setRequests(data.requests || []))
     }, [jobUpdates, searchParams, refetch])
+
+    const handleEditChange = (field: string, value: string) => {
+        setEditFormData((prev: any) => ({ ...prev, [field]: value }))
+    }
+
+    const handleSaveEdit = async () => {
+        if (!editingRequest) return
+        setIsSavingEdit(true)
+        try {
+            const res = await api.updateRequestByAdmin(editingRequest.id, editFormData)
+            if (res.success) {
+                toast.success("Request updated successfully")
+                setEditingRequest(null)
+                // We rely on SSE or manual refetch to update the list, but we can do a quick manual refetch here:
+                const filters = {
+                    search: searchParams.get("search") || undefined,
+                    serviceType: searchParams.get("serviceType") || undefined,
+                    priority: searchParams.get("priority") || undefined,
+                    status: searchParams.get("status") || undefined,
+                }
+                const data = await getRequestsAction(filters)
+                if (data && data.requests) {
+                    setRequests(data.requests)
+                }
+            } else {
+                toast.error(res.message || "Failed to update request")
+            }
+        } catch (e) {
+            toast.error("An error occurred while saving")
+        } finally {
+            setIsSavingEdit(false)
+        }
+    }
 
     const handleDeleteClick = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation()
@@ -219,19 +262,35 @@ export default function AdminRequestsClient({
                                         </div>
                                         <div className="flex gap-2 items-center flex-shrink-0">
                                             <button
-                                                onClick={(e) => handleDeleteClick(e, req.id)}
-                                                className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setDeletingRequestId(req.id)
+                                                    setDeleteWarning(null)
+                                                    handleDeleteClick(e, req.id)
+                                                }}
+                                                className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/50 transition-colors"
+                                                title="Delete Request"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                             <button 
                                                 onClick={(e) => {
                                                     e.stopPropagation()
-                                                    router.push(`/admin/requests/${req.id}`)
+                                                    setEditingRequest(req)
+                                                    setEditFormData({
+                                                        serviceType: req.serviceType || '',
+                                                        priority: req.priority || '',
+                                                        description: req.description || '',
+                                                        timeSlot: req.timeSlot || '',
+                                                        supervisorName: req.supervisorName || '',
+                                                        supervisorPhone: req.supervisorPhone || '',
+                                                        status: req.status || '',
+                                                    })
                                                 }}
-                                                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"
+                                                className="p-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-900/50 transition-colors"
+                                                title="Edit Request"
                                             >
-                                                <ChevronRight className="w-4 h-4" />
+                                                <PenTool className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </div>
@@ -290,7 +349,67 @@ export default function AdminRequestsClient({
                 </ErrorBoundary>
             </main>
 
-            <BottomNav active="jobs" role="admin" />
+            <Dialog open={!!editingRequest} onOpenChange={(open) => !open && setEditingRequest(null)}>
+                <DialogContent className="max-w-md w-[90vw] rounded-2xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Edit Request</DialogTitle>
+                    </DialogHeader>
+                    {editingRequest && (
+                        <div className="space-y-4 p-1">
+                            <div className="grid gap-3">
+                                <label className="text-sm font-medium">Service Type
+                                    <select value={editFormData.serviceType || ''} onChange={(e) => handleEditChange('serviceType', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                        <option value="ELECTRICAL">Electrical</option>
+                                        <option value="PLUMBING">Plumbing</option>
+                                        <option value="HVAC">HVAC</option>
+                                        <option value="MECHANICAL">Mechanical</option>
+                                        <option value="GENERAL">General</option>
+                                    </select>
+                                </label>
+                                <label className="text-sm font-medium">Priority
+                                    <select value={editFormData.priority || ''} onChange={(e) => handleEditChange('priority', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                        <option value="LOW">Low</option>
+                                        <option value="MEDIUM">Medium</option>
+                                        <option value="HIGH">High</option>
+                                        <option value="CRITICAL">Critical</option>
+                                    </select>
+                                </label>
+                                <label className="text-sm font-medium">Status
+                                    <select value={editFormData.status || ''} onChange={(e) => handleEditChange('status', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                        <option value="Requested">Requested</option>
+                                        <option value="Pending_Assign">Pending Assign</option>
+                                        <option value="Team_Forming">Team Forming</option>
+                                        <option value="Assigned">Assigned</option>
+                                        <option value="In_Progress">In Progress</option>
+                                        <option value="Completed">Completed</option>
+                                        <option value="Cancelled">Cancelled</option>
+                                    </select>
+                                </label>
+                                <label className="text-sm font-medium">Time Slot
+                                    <input value={editFormData.timeSlot || ''} onChange={(e) => handleEditChange('timeSlot', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                                </label>
+                                <label className="text-sm font-medium">Supervisor Name
+                                    <input value={editFormData.supervisorName || ''} onChange={(e) => handleEditChange('supervisorName', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                                </label>
+                                <label className="text-sm font-medium">Supervisor Phone
+                                    <input value={editFormData.supervisorPhone || ''} onChange={(e) => handleEditChange('supervisorPhone', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                                </label>
+                                <label className="text-sm font-medium">Description
+                                    <textarea value={editFormData.description || ''} onChange={(e) => handleEditChange('description', e.target.value)} rows={3} className="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                                </label>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-4">
+                                <button onClick={() => setEditingRequest(null)} className="px-4 py-2 text-sm border rounded-lg hover:bg-muted" disabled={isSavingEdit}>Cancel</button>
+                                <button onClick={handleSaveEdit} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2" disabled={isSavingEdit}>
+                                    {isSavingEdit && <Loader2 className="w-4 h-4 animate-spin" />} Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            <BottomNav active="requests" role="admin" />
 
             {/* Delete Confirmation Modal */}
             {deletingRequestId && (

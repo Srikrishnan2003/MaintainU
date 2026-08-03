@@ -813,3 +813,86 @@ export async function getActivityFeedAction() {
         return { success: false, data: [] };
     }
 }
+
+/**
+ * Admin Action: Update technician profile
+ */
+export async function updateTechnicianProfileByAdmin(technicianId: string, payload: any): Promise<ActionResult> {
+    try {
+        await requireRole("admin");
+        
+        // Ensure technician exists
+        const techRecords = await db.select().from(technicians).where(eq(technicians.id, technicianId)).limit(1);
+        const techRecord = techRecords[0];
+        if (!techRecord) return { success: false, message: "Technician not found" };
+
+        await db.transaction(async (tx) => {
+            // Update users table fields if provided
+            if (payload.name || payload.phone) {
+                const userUpdate: any = {};
+                if (payload.name) userUpdate.name = payload.name;
+                if (payload.phone) userUpdate.phone = payload.phone;
+                userUpdate.updatedAt = new Date();
+                
+                await tx.update(users)
+                    .set(userUpdate)
+                    .where(eq(users.id, techRecord.userId));
+            }
+            
+            // Update technicians table fields
+            const techUpdate: any = { updatedAt: new Date() };
+            if (payload.experience !== undefined) techUpdate.experience = parseInt(payload.experience) || 0;
+            if (payload.experienceLevel) techUpdate.experienceLevel = payload.experienceLevel;
+            if (payload.primarySkill) techUpdate.primarySkill = payload.primarySkill;
+            if (payload.dailyRate !== undefined) techUpdate.dailyRate = parseInt(payload.dailyRate) || 0;
+            
+            // Only execute update if there's something to update (other than updatedAt)
+            if (Object.keys(techUpdate).length > 1) {
+                await tx.update(technicians)
+                    .set(techUpdate)
+                    .where(eq(technicians.id, technicianId));
+            }
+        });
+
+        return { success: true, message: "Technician profile updated successfully" };
+    } catch (e: any) {
+        console.error("updateTechnicianProfileByAdmin error:", e);
+        return { success: false, message: e.message || "Failed to update technician" };
+    }
+}
+
+/**
+ * Admin Action: Update company request
+ */
+export async function updateRequestByAdmin(requestId: string, payload: any): Promise<ActionResult> {
+    try {
+        await requireRole("admin");
+        
+        // Ensure request exists
+        const reqRecords = await db.select().from(requests).where(eq(requests.id, requestId)).limit(1);
+        const reqRecord = reqRecords[0];
+        if (!reqRecord) return { success: false, message: "Request not found" };
+
+        const reqUpdate: any = { updatedAt: new Date() };
+        if (payload.serviceType) reqUpdate.serviceType = payload.serviceType;
+        if (payload.priority) reqUpdate.priority = payload.priority;
+        if (payload.description) reqUpdate.description = payload.description;
+        if (payload.timeSlot) reqUpdate.timeSlot = payload.timeSlot;
+        if (payload.supervisorName) reqUpdate.supervisorName = payload.supervisorName;
+        if (payload.supervisorPhone) reqUpdate.supervisorPhone = payload.supervisorPhone;
+        if (payload.status) reqUpdate.status = payload.status;
+        
+        await db.update(requests)
+            .set(reqUpdate)
+            .where(eq(requests.id, requestId));
+
+        if (payload.status && payload.status !== reqRecord.status) {
+            await logStatusChange(null, requestId, reqRecord.status, payload.status, "Status manually updated by admin via edit form");
+        }
+
+        return { success: true, message: "Request updated successfully" };
+    } catch (e: any) {
+        console.error("updateRequestByAdmin error:", e);
+        return { success: false, message: e.message || "Failed to update request" };
+    }
+}

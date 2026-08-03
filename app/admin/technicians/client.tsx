@@ -158,8 +158,37 @@ export default function AdminTechniciansClient({ initialData }: { initialData: a
   const [selectedUserDetails, setSelectedUserDetails] = useState<any>(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
   
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [editFormData, setEditFormData] = useState<any>({})
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  
   const [confirmAction, setConfirmAction] = useState<{ type: 'restore' | 'ban' | 'remove' } | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
+
+  const handleEditChange = (field: string, value: string) => {
+      setEditFormData((prev: any) => ({ ...prev, [field]: value }))
+  }
+
+  const handleSaveEdit = async () => {
+      if (!selectedUserDetails) return
+      setIsSavingEdit(true)
+      try {
+          const res = await api.updateTechnicianByAdmin(selectedUserDetails.details.id, editFormData)
+          if (res.success) {
+              toast.success("Profile updated successfully")
+              setIsEditingProfile(false)
+              router.refresh()
+              // Re-fetch details to show updated info
+              handleViewDetails(selectedUserDetails.id)
+          } else {
+              toast.error(res.message || "Failed to update profile")
+          }
+      } catch (e) {
+          toast.error("An error occurred while saving")
+      } finally {
+          setIsSavingEdit(false)
+      }
+  }
   
   const handleConfirmAction = async () => {
       if (!confirmAction || !selectedUserDetails) return;
@@ -426,13 +455,72 @@ export default function AdminTechniciansClient({ initialData }: { initialData: a
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
           <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto w-[90vw] rounded-2xl">
               <DialogHeader>
-                  <DialogTitle>Registration Details</DialogTitle>
-                  <DialogDescription>
-                      Review the full information provided by this user.
-                  </DialogDescription>
+                  <div className="flex justify-between items-center pr-4">
+                      <div>
+                          <DialogTitle>Registration Details</DialogTitle>
+                          <DialogDescription>
+                              Review the full information provided by this user.
+                          </DialogDescription>
+                      </div>
+                      {selectedUserDetails?.role === 'technician' && !detailsLoading && (
+                          <button
+                              onClick={() => {
+                                  if (!isEditingProfile) {
+                                      setEditFormData({
+                                          name: selectedUserDetails.name || '',
+                                          phone: selectedUserDetails.phone || '',
+                                          experience: selectedUserDetails.details.experience || '',
+                                          experienceLevel: selectedUserDetails.details.experienceLevel || '',
+                                          primarySkill: selectedUserDetails.details.primarySkill || '',
+                                          dailyRate: selectedUserDetails.details.dailyRate || '',
+                                      })
+                                  }
+                                  setIsEditingProfile(!isEditingProfile)
+                              }}
+                              className="p-2 bg-muted/50 rounded hover:bg-muted text-foreground/80 hover:text-foreground transition"
+                              title="Edit Profile"
+                          >
+                              {isEditingProfile ? <X className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
+                          </button>
+                      )}
+                  </div>
               </DialogHeader>
               {detailsLoading ? (
                   <div className="space-y-4 p-4"><CardSkeleton /><CardSkeleton /></div>
+              ) : selectedUserDetails && isEditingProfile ? (
+                  <div className="space-y-4 p-1">
+                      <div className="grid gap-3">
+                          <label className="text-sm font-medium">Name
+                              <input value={editFormData.name || ''} onChange={(e) => handleEditChange('name', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                          </label>
+                          <label className="text-sm font-medium">Phone
+                              <input value={editFormData.phone || ''} onChange={(e) => handleEditChange('phone', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                          </label>
+                          <label className="text-sm font-medium">Primary Skill
+                              <input value={editFormData.primarySkill || ''} onChange={(e) => handleEditChange('primarySkill', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                          </label>
+                          <label className="text-sm font-medium">Experience (Years)
+                              <input type="number" value={editFormData.experience || ''} onChange={(e) => handleEditChange('experience', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                          </label>
+                          <label className="text-sm font-medium">Experience Level
+                              <select value={editFormData.experienceLevel || ''} onChange={(e) => handleEditChange('experienceLevel', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                  <option value="">Select...</option>
+                                  <option value="Beginner">Beginner (0-2 Yrs)</option>
+                                  <option value="Intermediate">Intermediate (3-5 Yrs)</option>
+                                  <option value="Expert">Expert (5+ Yrs)</option>
+                              </select>
+                          </label>
+                          <label className="text-sm font-medium">Daily Rate (₹)
+                              <input type="number" value={editFormData.dailyRate || ''} onChange={(e) => handleEditChange('dailyRate', e.target.value)} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                          </label>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-4">
+                          <button onClick={() => setIsEditingProfile(false)} className="px-4 py-2 text-sm border rounded-lg hover:bg-muted" disabled={isSavingEdit}>Cancel</button>
+                          <button onClick={handleSaveEdit} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2" disabled={isSavingEdit}>
+                              {isSavingEdit && <Loader2 className="w-4 h-4 animate-spin" />} Save Changes
+                          </button>
+                      </div>
+                  </div>
               ) : selectedUserDetails ? (
                   <div className="space-y-4">
                       <div className="p-4 bg-muted/50 rounded-xl space-y-2">

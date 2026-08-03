@@ -252,6 +252,16 @@ export const api = {
 
   // ─── Admin ──────────────────────────────────────────────────────────
   
+  async updateTechnicianByAdmin(technicianId: string, payload: any) {
+    const { updateTechnicianProfileByAdmin } = await import("@/actions/admin.action")
+    return updateTechnicianProfileByAdmin(technicianId, payload)
+  },
+
+  async updateRequestByAdmin(requestId: string, payload: any) {
+    const { updateRequestByAdmin } = await import("@/actions/admin.action")
+    return updateRequestByAdmin(requestId, payload)
+  },
+
   async getRequests() {
     const { getRequestsAction } = await import("@/actions/admin.action")
     return getRequestsAction()
