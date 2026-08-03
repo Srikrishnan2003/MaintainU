@@ -21,13 +21,13 @@ const authMiddleware = async ({ req }: { req: Request }) => {
     
     if (!token) {
         console.error("UploadThing Auth Error: No token found");
-        throw new UploadThingError({ code: "UNAUTHORIZED", message: "Unauthorized: Missing session token" });
+        throw new UploadThingError({ code: "FORBIDDEN", message: "Unauthorized: Missing session token" });
     }
     
     const payload = await verifyToken(token);
     if (!payload || !payload.userId) {
         console.error("UploadThing Auth Error: Invalid token");
-        throw new UploadThingError({ code: "UNAUTHORIZED", message: "Unauthorized: Invalid session token" });
+        throw new UploadThingError({ code: "FORBIDDEN", message: "Unauthorized: Invalid session token" });
     }
     
     return { userId: payload.userId, role: payload.role };
