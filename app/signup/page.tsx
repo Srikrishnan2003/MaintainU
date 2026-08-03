@@ -8,6 +8,20 @@ import { toast } from "sonner"
 import { UploadButton } from "@/lib/uploadthing"
 import { useSSE } from "@/hooks/use-sse"
 
+const tradeSpecializations: Record<string, string[]> = {
+  "Electrical": ["High Voltage", "Panel Wiring", "Appliance Repair", "Lighting", "Troubleshooting"],
+  "Mechanical": ["Heavy Machinery", "Welding", "Automotive", "Pumps/Motors", "Conveyors"],
+  "HVAC": ["AC Installation", "Heating Systems", "Ductwork", "Refrigeration", "Maintenance"],
+  "Plumbing": ["Piping", "Drain Cleaning", "Water Heaters", "Leak Detection", "Commercial"],
+  "Assembly": ["Furniture", "Electronics", "Industrial", "Quality Control"],
+};
+
+const experienceLevels = [
+  { value: "Apprentice", label: "Apprentice", desc: "0-2 Yrs" },
+  { value: "Journeyman", label: "Journeyman", desc: "3-5 Yrs" },
+  { value: "Master", label: "Master", desc: "5+ Yrs" }
+];
+
 type Step = "details-tech-1" | "details-tech-2" | "details-tech-3" | "details-comp-1" | "details-comp-2" | "verify-required" | "waiting" | "approved"
 
 function SignupContent() {
@@ -37,6 +51,8 @@ function SignupContent() {
   const [gender, setGender] = useState("")
   const [address, setAddress] = useState("")
   const [experience, setExperience] = useState("")
+  const [experienceLevel, setExperienceLevel] = useState("")
+  const [skills, setSkills] = useState<string[]>([])
   const [primarySkill, setPrimarySkill] = useState("")
   
   // Documents
@@ -209,6 +225,8 @@ function SignupContent() {
         gender,
         address,
         experience,
+        experienceLevel,
+        skills,
         primarySkill,
         documents: { aadharFront, aadharBack, panCard, resume, photo },
         bankDetails: { bankName, accountNumber, ifsc, upi }
@@ -352,15 +370,37 @@ function SignupContent() {
 
         {/* Technician Step 2: Professional */}
         {step === "details-tech-2" && (
-          <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-            <div className="space-y-4">
+          <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
+            
+            <div className="space-y-3">
+              <label className="text-sm font-bold text-foreground">Experience Level</label>
+              <div className="grid grid-cols-3 gap-2">
+                {experienceLevels.map(level => (
+                  <button
+                    key={level.value}
+                    onClick={() => setExperienceLevel(level.value)}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${experienceLevel === level.value ? "bg-primary text-primary-foreground border-primary shadow-md" : "bg-card border-border text-foreground hover:bg-muted"}`}
+                  >
+                    <span className="font-bold text-sm">{level.label}</span>
+                    <span className={`text-[10px] mt-1 ${experienceLevel === level.value ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{level.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-bold text-foreground">Years of Experience</label>
               <input
-                type="number" placeholder="Years of Experience" value={experience} onChange={(e) => setExperience(e.target.value)}
+                type="number" placeholder="e.g. 4" value={experience} onChange={(e) => setExperience(e.target.value)}
                 className="w-full px-4 py-3.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
               />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-bold text-foreground">Primary Trade</label>
               <div className="relative">
                 <select
-                  value={primarySkill} onChange={(e) => setPrimarySkill(e.target.value)}
+                  value={primarySkill} onChange={(e) => { setPrimarySkill(e.target.value); setSkills([]); }}
                   className="w-full px-4 py-3.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium appearance-none"
                 >
                   <option value="">Select Primary Skill</option>
@@ -375,7 +415,30 @@ function SignupContent() {
                 </div>
               </div>
             </div>
-            <div className="flex gap-3">
+
+            {primarySkill && tradeSpecializations[primarySkill] && (
+              <div className="space-y-3 animate-in fade-in zoom-in duration-300">
+                <label className="text-sm font-bold text-foreground">Specializations</label>
+                <div className="flex flex-wrap gap-2">
+                  {tradeSpecializations[primarySkill].map(skill => (
+                    <button
+                      key={skill}
+                      onClick={() => {
+                        const newSkills = skills.includes(skill)
+                          ? skills.filter(s => s !== skill)
+                          : [...skills, skill];
+                        setSkills(newSkills);
+                      }}
+                      className={`px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${skills.includes(skill) ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-card border-border text-foreground hover:bg-muted"}`}
+                    >
+                      {skill}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
               <button onClick={() => setStep("details-tech-1")} className="flex-1 py-4 rounded-xl border border-border font-bold">Back</button>
               <button onClick={() => setStep("details-tech-3")} className="flex-[2] py-4 rounded-xl bg-primary text-white font-bold flex items-center justify-center gap-2">
                 Next <ArrowRight className="w-4 h-4" />
@@ -613,7 +676,7 @@ function SignupContent() {
               {role === 'technician' ? (
                 <>                   <div className="flex justify-between"><span className="text-muted-foreground">Name:</span> <span className="font-medium">{name || "-"}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Skill:</span> <span className="font-medium">{primarySkill || "-"}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Exp:</span> <span className="font-medium">{experience || "0"} YRS</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Exp:</span> <span className="font-medium">{experience || "0"} YRS ({experienceLevel || "-"})</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Docs:</span> <span className="font-medium text-blue-600">{aadharFront && aadharBack && panCard && resume && photo ? "Full" : "Partial"}</span></div>
                 </>
               ) : (
