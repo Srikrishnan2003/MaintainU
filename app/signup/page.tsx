@@ -183,11 +183,11 @@ function SignupContent() {
 
   return (
     <div className={`${appClass} min-h-screen flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-950 dark:to-slate-900`}>
-      <div className="w-full max-w-lg glass p-6 sm:p-8 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden">
+      <div className="w-full max-w-xl glass p-6 sm:p-8 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden">
         {/* Header */}
         <div className="mb-6 space-y-2 text-center">
           <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">
-            {appName} — {role === "technician" ? "Technician Registration" : "Company Registration"}
+            {role === "technician" ? "Technician Setup" : "Company Setup"}
           </span>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             {step === "details-tech-1" && "Personal Details"}

@@ -170,8 +170,6 @@ export function TechnicianStep2({ formData, updateData, setStep }: StepProps) {
 export function TechnicianStep3({ formData, updateData, setStep }: StepProps) {
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
-      <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider px-1">Required Documents</h2>
-      
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Profile Photo */}
         <div className="p-4 rounded-2xl border border-dashed border-border bg-card/30 flex flex-col items-center gap-3 transition-all hover:bg-card/50">
@@ -238,9 +236,9 @@ export function TechnicianStep3({ formData, updateData, setStep }: StepProps) {
 
       <div className="space-y-3">
         {[
-          { label: "Aadhaar Card (Front)", state: formData.aadharFront, setter: (url: string) => updateData({ aadharFront: url }), type: "Image • Max 2MB" },
-          { label: "Aadhaar Card (Back)", state: formData.aadharBack, setter: (url: string) => updateData({ aadharBack: url }), type: "Image • Max 2MB" },
-          { label: "PAN Card", state: formData.panCard, setter: (url: string) => updateData({ panCard: url }), type: "Image • Max 2MB" }
+          { label: "Aadhaar (Front)", state: formData.aadharFront, setter: (url: string) => updateData({ aadharFront: url }), type: "Image • Max 2MB" },
+          { label: "Aadhaar (Back)", state: formData.aadharBack, setter: (url: string) => updateData({ aadharBack: url }), type: "Image • Max 2MB" },
+          { label: "PAN", state: formData.panCard, setter: (url: string) => updateData({ panCard: url }), type: "Image • Max 2MB" }
         ].map((doc, idx) => (
           <div key={idx} className="p-3.5 rounded-2xl border border-border bg-white dark:bg-card/50 flex items-center justify-between gap-4 transition-all hover:border-primary/30">
             <div className="flex flex-col">
