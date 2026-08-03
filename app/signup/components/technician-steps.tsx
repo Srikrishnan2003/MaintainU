@@ -114,13 +114,6 @@ export function TechnicianStep2({ formData, updateData, setStep }: StepProps) {
         </div>
       </div>
 
-      <div className="space-y-3">
-        <label className="text-sm font-bold text-foreground">Years of Experience</label>
-        <input
-          type="number" placeholder="e.g. 4" value={formData.experience} onChange={(e) => updateData({ experience: e.target.value })}
-          className="w-full px-4 py-3.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
-        />
-      </div>
 
       <div className="space-y-3">
         <label className="text-sm font-bold text-foreground">Primary Trade</label>
