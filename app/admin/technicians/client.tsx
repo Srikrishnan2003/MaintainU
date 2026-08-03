@@ -491,19 +491,14 @@ export default function AdminTechniciansClient({ initialData }: { initialData: a
                                   <div className="p-4 bg-muted/50 rounded-xl space-y-2 border border-border/50">
                                       <p className="text-sm font-semibold pb-1 border-b border-border/50">Verification Documents</p>
                                       <div className="grid grid-cols-1 gap-2 pt-1 font-medium">
-                                          {selectedUserDetails.details.documents.aadharFront && (
-                                              <a href={selectedUserDetails.details.documents.aadharFront} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
-                                                  <Eye className="w-3 h-3" /> Aadhar Front
+                                          {selectedUserDetails.details.documents.eAadhaar && (
+                                              <a href={selectedUserDetails.details.documents.eAadhaar} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+                                                  <Eye className="w-3 h-3" /> e-Aadhaar
                                               </a>
                                           )}
-                                          {selectedUserDetails.details.documents.aadharBack && (
-                                              <a href={selectedUserDetails.details.documents.aadharBack} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
-                                                  <Eye className="w-3 h-3" /> Aadhar Back
-                                              </a>
-                                          )}
-                                           {selectedUserDetails.details.documents.panCard && (
-                                               <a href={selectedUserDetails.details.documents.panCard} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
-                                                   <Eye className="w-3 h-3" /> PAN Card
+                                           {selectedUserDetails.details.documents.ePan && (
+                                               <a href={selectedUserDetails.details.documents.ePan} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+                                                   <Eye className="w-3 h-3" /> e-PAN
                                                </a>
                                            )}
                                            {selectedUserDetails.details.documents.resume && (

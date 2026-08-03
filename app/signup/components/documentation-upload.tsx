@@ -4,12 +4,12 @@ import { useState, useRef, useMemo } from "react"
 import { User, FileText, IdCard, Check, Loader2 } from "lucide-react"
 import { useUploadThing } from "@/lib/uploadthing"
 
-export type DocId = "photo" | "resume" | "aadharFront" | "aadharBack" | "panCard"
+export type DocId = "photo" | "resume" | "eAadhaar" | "ePan"
 
 export interface DocConfig {
   id: DocId
   title: string
-  type: "image" | "pdf"
+  type: "image" | "pdf" | "imageOrPdf"
   maxSizeMB: number
   icon: any
   group: "general" | "identity"
@@ -18,9 +18,8 @@ export interface DocConfig {
 export const DOCUMENTS_CONFIG: DocConfig[] = [
   { id: "photo", title: "Profile photo", type: "image", maxSizeMB: 2, icon: User, group: "general" },
   { id: "resume", title: "Resume / CV", type: "pdf", maxSizeMB: 4, icon: FileText, group: "general" },
-  { id: "aadharFront", title: "Aadhaar (front)", type: "image", maxSizeMB: 2, icon: IdCard, group: "identity" },
-  { id: "aadharBack", title: "Aadhaar (back)", type: "image", maxSizeMB: 2, icon: IdCard, group: "identity" },
-  { id: "panCard", title: "PAN card", type: "image", maxSizeMB: 2, icon: IdCard, group: "identity" },
+  { id: "eAadhaar", title: "e-Aadhaar", type: "imageOrPdf", maxSizeMB: 4, icon: IdCard, group: "identity" },
+  { id: "ePan", title: "e-PAN", type: "imageOrPdf", maxSizeMB: 4, icon: IdCard, group: "identity" },
 ]
 
 type DocState = 
@@ -59,7 +58,8 @@ export function DocumentationUpload({ initialData, onBack, onSubmit, isSubmittin
   const handleTriggerUpload = (docId: DocId) => {
     setActiveDocId(docId)
     if (fileInputRef.current) {
-      fileInputRef.current.accept = DOCUMENTS_CONFIG.find(d => d.id === docId)?.type === "pdf" ? "application/pdf" : "image/*"
+      const configType = DOCUMENTS_CONFIG.find(d => d.id === docId)?.type
+      fileInputRef.current.accept = configType === "pdf" ? "application/pdf" : configType === "image" ? "image/*" : "image/*,application/pdf"
       fileInputRef.current.value = "" // reset
       fileInputRef.current.click()
     }
@@ -80,6 +80,10 @@ export function DocumentationUpload({ initialData, onBack, onSubmit, isSubmittin
     }
     if (config.type === "pdf" && file.type !== "application/pdf") {
       setDocStates(prev => ({ ...prev, [docId]: { status: "error", message: "Must be a PDF" } }))
+      return
+    }
+    if (config.type === "imageOrPdf" && !file.type.startsWith("image/") && file.type !== "application/pdf") {
+      setDocStates(prev => ({ ...prev, [docId]: { status: "error", message: "Must be Image or PDF" } }))
       return
     }
 
@@ -131,7 +135,7 @@ export function DocumentationUpload({ initialData, onBack, onSubmit, isSubmittin
               <span className="text-xs text-green-600 font-medium truncate">{state.filename}</span>
             ) : (
               <span className="text-xs text-muted-foreground truncate">
-                {doc.type === "image" ? "Image" : "PDF only"} • Max {doc.maxSizeMB}MB
+                {doc.type === "image" ? "Image" : doc.type === "pdf" ? "PDF only" : "Image / PDF"} • Max {doc.maxSizeMB}MB
               </span>
             )}
           </div>

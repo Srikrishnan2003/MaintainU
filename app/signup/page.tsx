@@ -23,7 +23,7 @@ function SignupContent() {
   const [formData, setFormData] = useState<SignupFormData>({
     phone: searchParams?.get("phone") || "",
     name: "", dob: "", gender: "", address: "", experience: "", experienceLevel: "", skills: [], primarySkill: "",
-    aadharFront: "", aadharBack: "", panCard: "", resume: "", photo: "",
+    eAadhaar: "", ePan: "", resume: "", photo: "",
     bankName: "", accountNumber: "", ifsc: "", upi: "",
     companyName: "", industry: "", gst: "", email: "", contactName: "", contactPhone: "", contactEmail: ""
   })
@@ -148,7 +148,7 @@ function SignupContent() {
     try {
       const details = role === 'technician' ? {
         name: formData.name, dob: formData.dob, gender: formData.gender, address: formData.address, experience: formData.experience, experienceLevel: formData.experienceLevel, skills: formData.skills, primarySkill: formData.primarySkill,
-        documents: { aadharFront: formData.aadharFront, aadharBack: formData.aadharBack, panCard: formData.panCard, resume: formData.resume, photo: formData.photo },
+        documents: { eAadhaar: formData.eAadhaar, ePan: formData.ePan, resume: formData.resume, photo: formData.photo },
         bankDetails: { bankName: formData.bankName, accountNumber: formData.accountNumber, ifsc: formData.ifsc, upi: formData.upi }
       } : {
         companyName: formData.companyName, industryType: formData.industry, address: formData.address, gstin: formData.gst, email: formData.email, contactPerson: formData.contactName, spokespersonPhone: formData.contactPhone, contactEmail: formData.contactEmail

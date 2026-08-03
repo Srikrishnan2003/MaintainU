@@ -26,7 +26,7 @@ export function FinalReviewStep({ role, formData, isLoading, handleSubmitForVeri
             <div className="flex justify-between"><span className="text-muted-foreground">Name:</span> <span className="font-medium">{formData.name || "-"}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Skill:</span> <span className="font-medium">{formData.primarySkill || "-"}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Exp:</span> <span className="font-medium">{formData.experience || "0"} YRS ({formData.experienceLevel || "-"})</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Docs:</span> <span className="font-medium text-blue-600">{formData.aadharFront && formData.aadharBack && formData.panCard && formData.resume && formData.photo ? "Full" : "Partial"}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Docs:</span> <span className="font-medium text-blue-600">{formData.eAadhaar && formData.ePan && formData.resume && formData.photo ? "Full" : "Partial"}</span></div>
           </>
         ) : (
           <>

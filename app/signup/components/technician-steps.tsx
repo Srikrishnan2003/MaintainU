@@ -173,9 +173,8 @@ export function TechnicianStep3({ formData, updateData, setStep, isLoading }: St
       initialData={{
         photo: formData.photo,
         resume: formData.resume,
-        aadharFront: formData.aadharFront,
-        aadharBack: formData.aadharBack,
-        panCard: formData.panCard,
+        eAadhaar: formData.eAadhaar,
+        ePan: formData.ePan,
       }}
       onBack={() => setStep("details-tech-2")}
       onSubmit={(data) => {

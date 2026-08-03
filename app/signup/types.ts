@@ -12,9 +12,8 @@ export interface SignupFormData {
   skills: string[];
   primarySkill: string;
   // Documents
-  aadharFront: string;
-  aadharBack: string;
-  panCard: string;
+  eAadhaar: string;
+  ePan: string;
   resume: string;
   photo: string;
   // Bank Details
