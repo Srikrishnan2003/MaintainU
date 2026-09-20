@@ -83,8 +83,11 @@ export const ourFileRouter = {
   technicianDocs: f({ 
         blob: { maxFileSize: "8MB", maxFileCount: 1 }
     })
-    .input(z.object({ session_token: z.string().optional() }))
+    .input(z.object({ session_token: z.string().optional(), isSignup: z.boolean().optional() }))
     .middleware(async ({ req, input }) => {
+        if (input?.isSignup) {
+            return { userId: "anonymous-signup", role: "signup" };
+        }
         const metadata = await authMiddleware({ req, sessionToken: input?.session_token });
         if (metadata.role !== "technician" && metadata.role !== "admin") throw new UploadThingError("Unauthorized role");
         return metadata;

@@ -113,8 +113,8 @@ export function DocumentationUpload({ initialData, onBack, onSubmit, isSubmittin
         fileToUpload = new File([file], `${file.name || 'upload'}.${ext}`, { type: file.type });
       }
 
-      // Upload with token injection via Zod payload
-      const res = await startUpload([fileToUpload], authToken ? { session_token: authToken } : {})
+      // Upload with token injection via Zod payload and allow anonymous signup uploads
+      const res = await startUpload([fileToUpload], authToken ? { session_token: authToken, isSignup: true } : { isSignup: true })
 
       if (res && res[0]) {
         setDocStates(prev => ({ ...prev, [docId]: { status: "uploaded", url: res[0].url, filename: file.name } }))
