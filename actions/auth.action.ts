@@ -29,6 +29,7 @@ export interface ApiResponse<T = any> {
     message: string;
     data?: T;
     error?: string;
+    status?: string;
 }
 
 /**
@@ -57,6 +58,9 @@ export async function sendOTP(phoneInput: string, inputRole?: "company" | "techn
         const existingUsers = await db.select().from(users).where(eq(users.phone, normalizedPhone)).limit(1);
         const user = existingUsers[0];
 
+        let finalStatus = user ? user.status : 'PENDING_PROFILE';
+        let isNewOrUpgraded = false;
+
         if (user) {
             if (user.status === 'REJECTED') return { success: false, error: "banned", message: "Account suspended or rejected" };
 
@@ -66,6 +70,13 @@ export async function sendOTP(phoneInput: string, inputRole?: "company" | "techn
                 if (inputRole && inputRole !== user.role) updates.role = inputRole;
                 if (details?.name || details?.companyName) updates.name = details?.name || details?.companyName;
 
+                // If details contain multiple keys, it means the full form was submitted
+                if (details && Object.keys(details).length > 2 && user.status === 'PENDING_PROFILE') {
+                    updates.status = 'PENDING_APPROVAL';
+                    finalStatus = 'PENDING_APPROVAL';
+                    isNewOrUpgraded = true;
+                }
+
                 if (Object.keys(updates).length > 0) {
                     await db.update(users).set(updates).where(eq(users.id, user.id));
                 }
@@ -73,7 +84,7 @@ export async function sendOTP(phoneInput: string, inputRole?: "company" | "techn
                 // Sync Profile Details minimally
                 if (user.role === 'technician' || inputRole === 'technician') {
                     const existingTech = await db.query.technicians.findFirst({ where: eq(technicians.userId, user.id) });
-                    const techData: any = { userId: user.id, ...details, status: user.status };
+                    const techData: any = { userId: user.id, ...details, status: finalStatus };
                     if (existingTech) await db.update(technicians).set(techData).where(eq(technicians.id, existingTech.id));
                     else await db.insert(technicians).values(techData);
                 } else if (user.role === 'company' || inputRole === 'company') {
@@ -86,17 +97,22 @@ export async function sendOTP(phoneInput: string, inputRole?: "company" | "techn
         } else {
             // New User flow (Self-registration)
             const role = inputRole || "company";
+            
+            // Determine if full details are provided initially
+            finalStatus = (details && Object.keys(details).length > 2) ? 'PENDING_APPROVAL' : 'PENDING_PROFILE';
+            if (finalStatus === 'PENDING_APPROVAL') isNewOrUpgraded = true;
+
             const [newUser] = await db.insert(users).values({
                 phone: normalizedPhone,
                 role,
-                status: 'PENDING_PROFILE',
+                status: finalStatus,
                 name: details?.name || details?.companyName || "New User"
             }).returning();
 
             if (role === 'technician') {
                 const techInsert: NewTechnician = {
                     userId: newUser.id,
-                    status: 'PENDING_PROFILE',
+                    status: finalStatus,
                     dob: details?.dob || undefined,
                     gender: details?.gender,
                     address: details?.address,
@@ -121,11 +137,30 @@ export async function sendOTP(phoneInput: string, inputRole?: "company" | "techn
             }
         }
 
+        // Notify Admins if newly upgraded to PENDING_APPROVAL
+        if (isNewOrUpgraded) {
+            import("@/actions/notification.action").then(async ({ sendPushNotification }) => {
+                try {
+                    const admins = await db.query.users.findMany({ where: eq(users.role, "admin") });
+                    for (const admin of admins) {
+                        await sendPushNotification(
+                            admin.id, 
+                            "New Account Registration", 
+                            `A new ${inputRole || "user"} account is waiting for approval.`,
+                            { route: "/admin/approvals" }
+                        );
+                    }
+                } catch (e) {
+                    console.error("Failed to notify admins of new registration:", e);
+                }
+            });
+        }
+
         // Standard OTP trigger for ALL users (Active or Pending)
         const otpResult = await createOTP(normalizedPhone);
-        if (!otpResult.success) return { success: false, message: otpResult.message };
+        if (!otpResult.success) return { success: false, message: otpResult.message, status: finalStatus };
 
-        return { success: true, message: "OTP sent successfully" };
+        return { success: true, message: "OTP sent successfully", status: finalStatus };
     } catch (error) {
         console.error("sendOTP error:", error);
         return { success: false, message: "An error occurred" };

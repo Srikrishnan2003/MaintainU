@@ -58,9 +58,10 @@ export interface Job {
 // API Response types
 export interface ApiResponse<T = unknown> {
   success: boolean
-  message?: string
+  message: string
   data?: T
   error?: string
+  status?: string
 }
 
 // Auth response type — discriminated union for type narrowing

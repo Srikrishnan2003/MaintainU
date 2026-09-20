@@ -177,19 +177,19 @@ function SignupContent() {
         companyName: formData.companyName, industryType: formData.industry, address: formData.address, gstin: formData.gst, email: formData.email, contactPerson: formData.contactName, spokespersonPhone: formData.contactPhone, contactEmail: formData.contactEmail
       }
       const res = await api.sendOTP(formData.phone, role, details)
-      if (res.error === 'PENDING_PROFILE' || res.error === 'PENDING_APPROVAL' || (res.success === false && res.message.includes("pending"))) {
+      if (res.status === 'PENDING_PROFILE' || res.status === 'PENDING_APPROVAL' || (res.success === false && res.message.includes("pending"))) {
         toast.info(res.message || "Account submitted for verification")
         setStep("waiting")
       } else if (res.success) {
-        if (res.error === 'PENDING_PROFILE' || res.error === 'PENDING_APPROVAL') setStep("waiting")
+        if (res.status === 'PENDING_PROFILE' || res.status === 'PENDING_APPROVAL') setStep("waiting")
         else {
-          toast.info("Account already active.")
+          toast.info("Account already active. Please login.")
           localStorage.removeItem("signup_formData")
           localStorage.removeItem("signup_step")
           router.push(`/login?phone=${formData.phone}`)
         }
       } else {
-        if (res.error === 'PENDING_PROFILE' || res.error === 'PENDING_APPROVAL') setStep("waiting")
+        if (res.status === 'PENDING_PROFILE' || res.status === 'PENDING_APPROVAL') setStep("waiting")
         else toast.error(res.message || "Failed to submit")
       }
     } catch (error) {
