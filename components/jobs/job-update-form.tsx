@@ -95,6 +95,7 @@ export function JobUpdateForm({ jobId }: { jobId: string }) {
                 <div className="bg-card/30 border border-border border-dashed rounded-xl p-3 flex justify-center">
                     <UploadDropzone
                         endpoint="jobPhoto"
+                        input={{}}
                         onClientUploadComplete={(res) => {
                             if (res && res.length > 0) {
                                 const newPhotos = res.map(file => file.url)
