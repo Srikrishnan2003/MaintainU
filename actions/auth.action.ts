@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
+import { sendPushNotification } from "@/actions/notification.action";
 import { users, companies, technicians } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { NewTechnician, NewCompany } from "@/db/types";
@@ -139,21 +140,19 @@ export async function sendOTP(phoneInput: string, inputRole?: "company" | "techn
 
         // Notify Admins if newly upgraded to PENDING_APPROVAL
         if (isNewOrUpgraded) {
-            import("@/actions/notification.action").then(async ({ sendPushNotification }) => {
-                try {
-                    const admins = await db.query.users.findMany({ where: eq(users.role, "admin") });
-                    for (const admin of admins) {
-                        await sendPushNotification(
-                            admin.id, 
-                            "New Account Registration", 
-                            `A new ${inputRole || "user"} account is waiting for approval.`,
-                            { route: "/admin/approvals" }
-                        );
-                    }
-                } catch (e) {
-                    console.error("Failed to notify admins of new registration:", e);
+            try {
+                const admins = await db.query.users.findMany({ where: eq(users.role, "admin") });
+                for (const admin of admins) {
+                    await sendPushNotification(
+                        admin.id, 
+                        "New Account Registration", 
+                        `A new ${inputRole || "user"} account is waiting for approval.`,
+                        { route: "/admin/approvals" }
+                    );
                 }
-            });
+            } catch (e) {
+                console.error("Failed to notify admins of new registration:", e);
+            }
         }
 
         // Standard OTP trigger for ALL users (Active or Pending)

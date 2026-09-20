@@ -178,7 +178,7 @@ function SignupContent() {
       }
       const res = await api.sendOTP(formData.phone, role, details)
       if (res.status === 'PENDING_PROFILE' || res.status === 'PENDING_APPROVAL' || (res.success === false && res.message.includes("pending"))) {
-        toast.info(res.message || "Account submitted for verification")
+        toast.success("Account submitted for verification")
         setStep("waiting")
       } else if (res.success) {
         if (res.status === 'PENDING_PROFILE' || res.status === 'PENDING_APPROVAL') setStep("waiting")
