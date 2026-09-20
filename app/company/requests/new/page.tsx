@@ -200,6 +200,7 @@ export default function NewRequestPage() {
               <div className="space-y-3">
                 <UploadDropzone
                   endpoint="requestAttachment"
+                  input={{}}
                   onUploadBegin={() => {
                     toast.loading("Uploading file...", { id: "upload-toast" });
                   }}

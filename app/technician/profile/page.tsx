@@ -145,6 +145,7 @@ export default function TechnicianProfile() {
                                     <div className="absolute inset-0 opacity-0 cursor-pointer">
                                         <UploadButton
                                             endpoint="technicianDocs"
+                                            input={{}}
                                             onClientUploadComplete={async (res) => {
                                                 if (res?.[0]) {
                                                     await api.updateTechnicianProfile({ photo: res[0].url });

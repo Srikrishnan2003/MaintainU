@@ -81,6 +81,7 @@ export default function TechnicianOnboarding() {
                         {/* We are tying all of these to the same mock endpoint for structure, since they all accept images/pdfs */}
                         <UploadButton
                             endpoint="technicianDocs"
+                            input={{}}
                             onClientUploadComplete={(res) => {
                                 if (res?.[0]) {
                                     setDocs(prev => ({ ...prev, [field]: res[0].url }))
