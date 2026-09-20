@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { cookies } from "next/headers";
 import { users, companies, technicians } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { NewTechnician, NewCompany } from "@/db/types";
