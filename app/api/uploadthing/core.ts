@@ -2,16 +2,19 @@ import { createUploadthing, type FileRouter } from "uploadthing/next";
 import { UploadThingError } from "uploadthing/server";
 import { cookies } from "next/headers";
 import { verifyToken } from "@/lib/jwt";
+import { z } from "zod";
 
 const f = createUploadthing();
 
-const authMiddleware = async ({ req }: { req: Request }) => {
-    let token = null;
+const authMiddleware = async ({ req, sessionToken }: { req: Request, sessionToken?: string | null }) => {
+    let token = sessionToken || null;
 
-    // 0. Try Authorization header first (injected by our client wrapper)
-    const authHeader = req.headers.get("authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-        token = authHeader.replace("Bearer ", "");
+    // 0. Try Authorization header first (fallback)
+    if (!token) {
+        const authHeader = req.headers.get("authorization");
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            token = authHeader.replace("Bearer ", "");
+        }
     }
 
     // 1. Try Next.js dynamic cookies() first
@@ -49,8 +52,9 @@ const authMiddleware = async ({ req }: { req: Request }) => {
 
 export const ourFileRouter = {
   jobPhoto: f({ image: { maxFileSize: "4MB", maxFileCount: 5 } })
-    .middleware(async (req) => {
-        const metadata = await authMiddleware(req);
+    .input(z.object({ session_token: z.string().optional() }))
+    .middleware(async ({ req, input }) => {
+        const metadata = await authMiddleware({ req, sessionToken: input.session_token });
         if (metadata.role !== "technician" && metadata.role !== "admin") throw new UploadThingError("Unauthorized role");
         return metadata;
     })
@@ -64,8 +68,9 @@ export const ourFileRouter = {
         image: { maxFileSize: "8MB", maxFileCount: 3 },
         pdf: { maxFileSize: "8MB", maxFileCount: 3 }
     })
-    .middleware(async (req) => {
-        const metadata = await authMiddleware(req);
+    .input(z.object({ session_token: z.string().optional() }))
+    .middleware(async ({ req, input }) => {
+        const metadata = await authMiddleware({ req, sessionToken: input.session_token });
         if (metadata.role !== "company" && metadata.role !== "admin") throw new UploadThingError("Unauthorized role");
         return metadata;
     })
@@ -78,8 +83,9 @@ export const ourFileRouter = {
   technicianDocs: f({ 
         blob: { maxFileSize: "8MB", maxFileCount: 1 }
     })
-    .middleware(async (req) => {
-        const metadata = await authMiddleware(req);
+    .input(z.object({ session_token: z.string().optional() }))
+    .middleware(async ({ req, input }) => {
+        const metadata = await authMiddleware({ req, sessionToken: input.session_token });
         if (metadata.role !== "technician" && metadata.role !== "admin") throw new UploadThingError("Unauthorized role");
         return metadata;
     })

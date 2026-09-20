@@ -19,7 +19,7 @@ export function UploadButton(props: React.ComponentProps<typeof BaseUploadButton
     
     if (!token) return <div className="animate-pulse w-full h-10 bg-muted rounded-xl" />;
     
-    return <BaseUploadButton {...props} headers={{ Authorization: `Bearer ${token}` }} />;
+    return <BaseUploadButton {...props} input={{ session_token: token }} />;
 }
 
 export function UploadDropzone(props: React.ComponentProps<typeof BaseUploadDropzone>) {
@@ -28,5 +28,5 @@ export function UploadDropzone(props: React.ComponentProps<typeof BaseUploadDrop
     
     if (!token) return <div className="animate-pulse w-full h-40 bg-muted rounded-xl" />;
     
-    return <BaseUploadDropzone {...props} headers={{ Authorization: `Bearer ${token}` }} />;
+    return <BaseUploadDropzone {...props} input={{ session_token: token }} />;
 }

@@ -113,10 +113,10 @@ export function DocumentationUpload({ initialData, onBack, onSubmit, isSubmittin
         fileToUpload = new File([file], `${file.name || 'upload'}.${ext}`, { type: file.type });
       }
 
-      // Upload with token injection
+      // Upload with token injection via Zod payload
       const res = await uploadFiles("technicianDocs", {
         files: [fileToUpload],
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined
+        input: authToken ? { session_token: authToken } : undefined
       })
 
       if (res && res[0]) {
