@@ -54,8 +54,8 @@ export default async function OnboardingPage({
         {/* Header */}
         <div className="space-y-3 text-center">
           <Logo size="xl" className="mx-auto mb-6" />
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">{pageTitle}</h1>
-          <p className="text-muted-foreground text-lg">Your maintenance partner</p>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">{pageTitle}</h1>
+          <p className="text-muted-foreground text-base sm:text-lg">Your maintenance partner</p>
         </div>
 
         {/* Role Selection */}
@@ -77,17 +77,17 @@ export default async function OnboardingPage({
                   <p className="text-sm text-muted-foreground">Request & manage maintenance</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-1 relative z-10">
+              <div className="flex flex-col min-[400px]:flex-row gap-2 pt-1 relative z-10">
                 <Link
                   href="/company/login"
                   style={{ color: "var(--color-accent)" }}
-                  className="py-2.5 px-3 rounded-xl bg-primary/10 hover:bg-primary hover:text-white font-bold text-sm transition-all text-center flex items-center justify-center"
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-primary/10 hover:bg-primary hover:text-white font-bold text-sm transition-all text-center flex items-center justify-center"
                 >
                   Sign In
                 </Link>
                 <Link
                   href="/signup?role=company"
-                  className="py-2.5 px-3 rounded-xl border border-border hover:border-primary/50 hover:bg-muted/50 font-bold text-sm transition-all text-center flex items-center justify-center text-foreground"
+                  className="flex-1 py-2.5 px-3 rounded-xl border border-border hover:border-primary/50 hover:bg-muted/50 font-bold text-sm transition-all text-center flex items-center justify-center text-foreground"
                 >
                   Register
                 </Link>
@@ -108,17 +108,17 @@ export default async function OnboardingPage({
                   <p className="text-sm text-muted-foreground">Accept & complete work orders</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-1 relative z-10">
+              <div className="flex flex-col min-[400px]:flex-row gap-2 pt-1 relative z-10">
                 <Link
                   href="/technician/login"
                   style={{ color: "var(--color-accent)" }}
-                  className="py-2.5 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-600 hover:text-white font-bold text-sm transition-all text-center flex items-center justify-center"
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-600 hover:text-white font-bold text-sm transition-all text-center flex items-center justify-center"
                 >
                   Sign In
                 </Link>
                 <Link
                   href="/signup?role=technician"
-                  className="py-2.5 px-3 rounded-xl border border-border hover:border-emerald-500/50 hover:bg-muted/50 font-bold text-sm transition-all text-center flex items-center justify-center text-foreground"
+                  className="flex-1 py-2.5 px-3 rounded-xl border border-border hover:border-emerald-500/50 hover:bg-muted/50 font-bold text-sm transition-all text-center flex items-center justify-center text-foreground"
                 >
                   Register
                 </Link>
