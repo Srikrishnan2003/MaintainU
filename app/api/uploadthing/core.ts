@@ -21,7 +21,7 @@ const authMiddleware = async ({ req, sessionToken }: { req: Request, sessionToke
     if (!token) {
         try {
             const cookieStore = await cookies();
-            token = cookieStore.get("session_token")?.value;
+            token = cookieStore.get("session_token")?.value || null;
         } catch (e) {
             console.warn("Next.js cookies() failed in UploadThing context, falling back to manual header parsing", e);
         }
