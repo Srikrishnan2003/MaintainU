@@ -6,21 +6,27 @@ import { verifyToken } from "@/lib/jwt";
 const f = createUploadthing();
 
 const authMiddleware = async ({ req }: { req: Request }) => {
-    // 1. Try NextRequest cookies method if available
-    let token = (req as any).cookies?.get?.("session_token")?.value;
+    let token = null;
 
-    // 2. Fallback to next/headers cookies()
+    // 1. Try Next.js dynamic cookies() first
+    try {
+        const cookieStore = await cookies();
+        token = cookieStore.get("session_token")?.value;
+    } catch (e) {
+        console.warn("Next.js cookies() failed in UploadThing context, falling back to manual header parsing", e);
+    }
+
+    // 2. Fallback to manual parsing from the raw Request headers
     if (!token) {
-        try {
-            const cookieStore = await cookies();
-            token = cookieStore.get("session_token")?.value;
-        } catch (e) {
-            // ignore
+        const cookieHeader = req.headers.get("cookie");
+        if (cookieHeader) {
+            const match = cookieHeader.match(/session_token=([^;]+)/);
+            if (match) token = match[1];
         }
     }
     
     if (!token) {
-        console.error("UploadThing Auth Error: No token found");
+        console.error("UploadThing Auth Error: No token found. Cookies present:", req.headers.get("cookie") ? "Yes" : "No");
         throw new UploadThingError({ code: "FORBIDDEN", message: "Unauthorized: Missing session token" });
     }
     
