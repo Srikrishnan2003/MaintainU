@@ -37,6 +37,7 @@ export async function createSession(user: {
         sameSite: "lax",
         path: "/",
         maxAge: expiryDays * 24 * 60 * 60, // seconds
+        expires: new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
     });
 
     // If admin, also set the admin flag cookie
@@ -47,6 +48,7 @@ export async function createSession(user: {
             sameSite: "lax",
             path: "/",
             maxAge: expiryDays * 24 * 60 * 60,
+            expires: new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
         });
     }
 }

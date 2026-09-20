@@ -30,6 +30,29 @@ function SignupContent() {
 
   const updateData = (data: Partial<SignupFormData>) => setFormData(prev => ({ ...prev, ...data }))
 
+  // Load state from local storage on initial mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedRole = localStorage.getItem("signup_role");
+      if (savedRole === role) {
+        const savedData = localStorage.getItem("signup_formData");
+        const savedStep = localStorage.getItem("signup_step");
+        if (savedData) setFormData(JSON.parse(savedData));
+        if (savedStep) setStep(savedStep as Step);
+      } else {
+        localStorage.setItem("signup_role", role || "");
+      }
+    }
+  }, [role]);
+
+  // Save state to local storage when it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("signup_formData", JSON.stringify(formData));
+      localStorage.setItem("signup_step", step);
+    }
+  }, [formData, step]);
+
   // Redirect to onboarding if role is missing or invalid
   useEffect(() => {
     const roleParam = searchParams?.get("role")
@@ -161,6 +184,8 @@ function SignupContent() {
         if (res.error === 'PENDING_PROFILE' || res.error === 'PENDING_APPROVAL') setStep("waiting")
         else {
           toast.info("Account already active.")
+          localStorage.removeItem("signup_formData")
+          localStorage.removeItem("signup_step")
           router.push(`/login?phone=${formData.phone}`)
         }
       } else {
