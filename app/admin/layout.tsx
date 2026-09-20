@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { ErrorBoundary } from "@/components/error-boundary";
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
     title: "MaintainU Admin",
     manifest: "/manifest-admin.json",
