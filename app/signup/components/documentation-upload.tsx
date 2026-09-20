@@ -114,7 +114,7 @@ export function DocumentationUpload({ initialData, onBack, onSubmit, isSubmittin
       }
 
       // Upload with token injection via Zod payload
-      const res = await startUpload([fileToUpload], authToken ? { session_token: authToken } : undefined)
+      const res = await startUpload([fileToUpload], authToken ? { session_token: authToken } : {})
 
       if (res && res[0]) {
         setDocStates(prev => ({ ...prev, [docId]: { status: "uploaded", url: res[0].url, filename: file.name } }))
