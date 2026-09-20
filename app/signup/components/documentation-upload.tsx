@@ -1,8 +1,13 @@
 "use client"
 
-import { useState, useRef, useMemo } from "react"
+import { useState, useRef, useMemo, useEffect } from "react"
 import { User, FileText, IdCard, Check, Loader2 } from "lucide-react"
 import { useUploadThing } from "@/lib/uploadthing"
+import { getSessionTokenAction } from "@/actions/auth.action"
+import { generateReactHelpers } from "@uploadthing/react"
+import type { OurFileRouter } from "@/app/api/uploadthing/core"
+
+const { uploadFiles } = generateReactHelpers<OurFileRouter>()
 
 export type DocId = "photo" | "resume" | "eAadhaar" | "ePan"
 
@@ -49,7 +54,12 @@ export function DocumentationUpload({ initialData, onBack, onSubmit, isSubmittin
     return initialState as Record<DocId, DocState>
   })
 
-  const { startUpload } = useUploadThing("technicianDocs")
+  // Secure token for UploadThing native fetch requests
+  const [authToken, setAuthToken] = useState<string | null>(null)
+  
+  useEffect(() => {
+    getSessionTokenAction().then(setAuthToken)
+  }, [])
   
   // Track which document is currently being selected via the hidden input
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -103,7 +113,12 @@ export function DocumentationUpload({ initialData, onBack, onSubmit, isSubmittin
         fileToUpload = new File([file], `${file.name || 'upload'}.${ext}`, { type: file.type });
       }
 
-      const res = await startUpload([fileToUpload])
+      // Upload with token injection
+      const res = await uploadFiles("technicianDocs", {
+        files: [fileToUpload],
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined
+      })
+
       if (res && res[0]) {
         setDocStates(prev => ({ ...prev, [docId]: { status: "uploaded", url: res[0].url, filename: file.name } }))
       } else {
