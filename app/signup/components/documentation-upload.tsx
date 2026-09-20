@@ -7,8 +7,6 @@ import { getSessionTokenAction } from "@/actions/auth.action"
 import { generateReactHelpers } from "@uploadthing/react"
 import type { OurFileRouter } from "@/app/api/uploadthing/core"
 
-const { uploadFiles } = generateReactHelpers<OurFileRouter>()
-
 export type DocId = "photo" | "resume" | "eAadhaar" | "ePan"
 
 export interface DocConfig {
@@ -60,6 +58,8 @@ export function DocumentationUpload({ initialData, onBack, onSubmit, isSubmittin
   useEffect(() => {
     getSessionTokenAction().then(setAuthToken)
   }, [])
+  
+  const { startUpload } = useUploadThing("technicianDocs")
   
   // Track which document is currently being selected via the hidden input
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -114,10 +114,7 @@ export function DocumentationUpload({ initialData, onBack, onSubmit, isSubmittin
       }
 
       // Upload with token injection via Zod payload
-      const res = await uploadFiles("technicianDocs", {
-        files: [fileToUpload],
-        input: authToken ? { session_token: authToken } : undefined
-      })
+      const res = await startUpload([fileToUpload], authToken ? { session_token: authToken } : undefined)
 
       if (res && res[0]) {
         setDocStates(prev => ({ ...prev, [docId]: { status: "uploaded", url: res[0].url, filename: file.name } }))
