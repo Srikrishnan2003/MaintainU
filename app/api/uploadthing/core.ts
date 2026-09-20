@@ -52,9 +52,9 @@ const authMiddleware = async ({ req, sessionToken }: { req: Request, sessionToke
 
 export const ourFileRouter = {
   jobPhoto: f({ image: { maxFileSize: "4MB", maxFileCount: 5 } })
-    .input(z.object({ session_token: z.string().optional() }))
+    .input(z.object({ session_token: z.string().optional() }).optional())
     .middleware(async ({ req, input }) => {
-        const metadata = await authMiddleware({ req, sessionToken: input.session_token });
+        const metadata = await authMiddleware({ req, sessionToken: input?.session_token });
         if (metadata.role !== "technician" && metadata.role !== "admin") throw new UploadThingError("Unauthorized role");
         return metadata;
     })
@@ -68,9 +68,9 @@ export const ourFileRouter = {
         image: { maxFileSize: "8MB", maxFileCount: 3 },
         pdf: { maxFileSize: "8MB", maxFileCount: 3 }
     })
-    .input(z.object({ session_token: z.string().optional() }))
+    .input(z.object({ session_token: z.string().optional() }).optional())
     .middleware(async ({ req, input }) => {
-        const metadata = await authMiddleware({ req, sessionToken: input.session_token });
+        const metadata = await authMiddleware({ req, sessionToken: input?.session_token });
         if (metadata.role !== "company" && metadata.role !== "admin") throw new UploadThingError("Unauthorized role");
         return metadata;
     })
@@ -83,9 +83,9 @@ export const ourFileRouter = {
   technicianDocs: f({ 
         blob: { maxFileSize: "8MB", maxFileCount: 1 }
     })
-    .input(z.object({ session_token: z.string().optional() }))
+    .input(z.object({ session_token: z.string().optional() }).optional())
     .middleware(async ({ req, input }) => {
-        const metadata = await authMiddleware({ req, sessionToken: input.session_token });
+        const metadata = await authMiddleware({ req, sessionToken: input?.session_token });
         if (metadata.role !== "technician" && metadata.role !== "admin") throw new UploadThingError("Unauthorized role");
         return metadata;
     })
