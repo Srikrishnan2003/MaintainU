@@ -1,10 +1,10 @@
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps, cert, getApp } from 'firebase-admin/app';
 
 // Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
+if (!getApps().length) {
     try {
-        admin.initializeApp({
-            credential: admin.credential.cert({
+        initializeApp({
+            credential: cert({
                 projectId: process.env.FIREBASE_PROJECT_ID,
                 clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
                 // Replace escaped newlines with actual newlines
@@ -17,4 +17,4 @@ if (!admin.apps.length) {
     }
 }
 
-export const firebaseAdmin = admin;
+export const firebaseAdmin = getApp();
