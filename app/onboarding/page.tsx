@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { Briefcase, Wrench, ShieldCheck } from "lucide-react"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Logo } from "@/components/ui/logo"
+import { ResumeRegistration } from "@/components/resume-registration"
 
 export async function generateMetadata({
   searchParams,
@@ -47,6 +48,7 @@ export default async function OnboardingPage({
 
   return (
     <div className={`${appClass} min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-950 dark:to-slate-900 relative`}>
+      <ResumeRegistration />
       <div className="absolute top-6 right-6">
         <ThemeToggle />
       </div>

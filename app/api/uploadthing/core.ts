@@ -8,12 +8,20 @@ const f = createUploadthing();
 const authMiddleware = async ({ req }: { req: Request }) => {
     let token = null;
 
+    // 0. Try Authorization header first (injected by our client wrapper)
+    const authHeader = req.headers.get("authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+        token = authHeader.replace("Bearer ", "");
+    }
+
     // 1. Try Next.js dynamic cookies() first
-    try {
-        const cookieStore = await cookies();
-        token = cookieStore.get("session_token")?.value;
-    } catch (e) {
-        console.warn("Next.js cookies() failed in UploadThing context, falling back to manual header parsing", e);
+    if (!token) {
+        try {
+            const cookieStore = await cookies();
+            token = cookieStore.get("session_token")?.value;
+        } catch (e) {
+            console.warn("Next.js cookies() failed in UploadThing context, falling back to manual header parsing", e);
+        }
     }
 
     // 2. Fallback to manual parsing from the raw Request headers

@@ -195,3 +195,8 @@ export async function checkUserStatusAction(phone: string) {
     if (!user) return { exists: false, status: "PENDING_PROFILE", role: "company" as const };
     return { exists: true, status: user.status, role: user.role };
 }
+
+export async function getSessionTokenAction() {
+    const cookieStore = await cookies();
+    return cookieStore.get("session_token")?.value || null;
+}
