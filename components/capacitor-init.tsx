@@ -11,7 +11,7 @@ export function CapacitorInit() {
         try {
           // Lock text zoom to 100% to prevent Android system font size settings 
           // from blowing up the UI and causing overflows.
-          await TextZoom.set({ value: 1.0 });
+          await TextZoom.setZoom({ zoom: 1.0 });
         } catch (error) {
           console.error("Failed to set text zoom:", error);
         }
