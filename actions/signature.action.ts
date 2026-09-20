@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { jobs, requests, companies, technicians, users, masterTeams, masterTeamMembers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { requireRole } from "@/services/auth.service";
+import { requireRole, getSession } from "@/services/auth.service";
 import { createNotification } from "@/services/notification.service";
 
 /**
@@ -11,6 +11,9 @@ import { createNotification } from "@/services/notification.service";
  */
 export async function getJobSignatureDetailsAction(jobId: string) {
     try {
+        const session = await getSession();
+        if (!session) return { success: false, message: "Unauthorized" };
+
         const result = await db.select({
             jobId: jobs.id,
             signatureUrl: jobs.signatureUrl,
@@ -21,7 +24,9 @@ export async function getJobSignatureDetailsAction(jobId: string) {
             companyName: companies.companyName,
             companyAddress: companies.address,
             technicianName: users.name,
-            technicianId: technicians.id
+            technicianId: technicians.id,
+            companyUserId: companies.userId,
+            requestTechnicianId: requests.technicianId
         })
         .from(jobs)
         .innerJoin(requests, eq(jobs.requestId, requests.id))
@@ -34,6 +39,25 @@ export async function getJobSignatureDetailsAction(jobId: string) {
         if (result.length === 0) return { success: false, message: "Job not found" };
 
         const job = result[0];
+
+        if (session.role === "company") {
+            if (job.companyUserId !== session.userId) return { success: false, message: "Unauthorized" };
+        } else if (session.role === "technician") {
+            const tech = await db.query.technicians.findFirst({ where: eq(technicians.userId, session.userId) });
+            if (!tech) return { success: false, message: "Unauthorized" };
+            
+            let authorized = job.requestTechnicianId === tech.id || job.technicianId === tech.id;
+            
+            if (!authorized) {
+                const teamMember = await db.select().from(masterTeamMembers)
+                    .innerJoin(masterTeams, eq(masterTeamMembers.masterTeamId, masterTeams.id))
+                    .where(and(eq(masterTeams.jobId, jobId), eq(masterTeamMembers.technicianId, tech.id)))
+                    .limit(1);
+                if (teamMember.length > 0) authorized = true;
+            }
+            
+            if (!authorized) return { success: false, message: "Unauthorized" };
+        }
 
         const teamMembers = await db.select({
             name: users.name,

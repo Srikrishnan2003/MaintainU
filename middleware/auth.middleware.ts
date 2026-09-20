@@ -120,7 +120,7 @@ export async function authenticateRequest(request: NextRequest) {
 
     if (!session) {
         if (tokenInvalid) {
-            if (pathname === "/company/login" || pathname === "/technician/login" || pathname === "/admin-login" || pathname === "/login") {
+            if (pathname === "/company/login" || pathname === "/technician/login" || pathname === "/admin-login" || pathname === "/login" || pathname === "/signup") {
                 const clearRes = NextResponse.next();
                 clearRes.cookies.delete("session_token");
                 clearRes.cookies.delete("admin_session");
@@ -141,8 +141,7 @@ export async function authenticateRequest(request: NextRequest) {
                 return response;
             }
         } else {
-            // Allow public access to role login screens when unauthenticated
-            if (pathname === "/company/login" || pathname === "/technician/login" || pathname === "/admin-login" || pathname === "/login") {
+            if (pathname === "/company/login" || pathname === "/technician/login" || pathname === "/admin-login" || pathname === "/login" || pathname === "/signup") {
                 return NextResponse.next();
             }
 

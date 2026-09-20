@@ -33,12 +33,11 @@ export async function submitCompanyOnboarding(formData: CompanyOnboardingInput) 
         const data = parsed.data;
 
         await db.transaction(async (tx) => {
-            await tx.insert(companies).values({
-               userId: user.userId,
+            await tx.update(companies).set({
                companyName: data.companyName,
                contactPerson: data.contactPerson,
                address: data.address,
-            });
+            }).where(eq(companies.userId, user.userId));
 
             await tx.update(users).set({
                status: "ACTIVE",

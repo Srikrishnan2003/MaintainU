@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration"
 import { Toaster } from "@/components/ui/sonner"
 import QAToolbar from '@/components/qa/QAToolbar'
+import { CapacitorInit } from "@/components/capacitor-init"
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-sans",
@@ -66,6 +67,7 @@ export default function RootLayout({
           {children}
           <Toaster />
           <ServiceWorkerRegistration />
+          <CapacitorInit />
         </ThemeProvider>
         <Analytics />
         {process.env.NODE_ENV === 'development' && <QAToolbar />}

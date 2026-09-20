@@ -57,7 +57,9 @@ export async function sendOTP(phoneInput: string, inputRole?: "company" | "techn
         const user = existingUsers[0];
 
         if (user) {
-            // Handle Pending statuses (profile not yet submitted, or not yet approved)
+            if (user.status === 'REJECTED') return { success: false, error: "banned", message: "Account suspended or rejected" };
+
+            // Handle Pending statuses
             if (user.status === 'PENDING_PROFILE' || user.status === 'PENDING_APPROVAL') {
                 const updates: any = {};
                 if (inputRole && inputRole !== user.role) updates.role = inputRole;
@@ -67,10 +69,10 @@ export async function sendOTP(phoneInput: string, inputRole?: "company" | "techn
                     await db.update(users).set(updates).where(eq(users.id, user.id));
                 }
 
-                // Sync Profile Details
+                // Sync Profile Details minimally
                 if (user.role === 'technician' || inputRole === 'technician') {
                     const existingTech = await db.query.technicians.findFirst({ where: eq(technicians.userId, user.id) });
-                    const techData: any = { userId: user.id, ...details, status: 'PENDING_PROFILE' };
+                    const techData: any = { userId: user.id, ...details, status: user.status };
                     if (existingTech) await db.update(technicians).set(techData).where(eq(technicians.id, existingTech.id));
                     else await db.insert(technicians).values(techData);
                 } else if (user.role === 'company' || inputRole === 'company') {
@@ -79,15 +81,7 @@ export async function sendOTP(phoneInput: string, inputRole?: "company" | "techn
                     if (existingComp) await db.update(companies).set(compData).where(eq(companies.id, existingComp.id));
                     else await db.insert(companies).values(compData);
                 }
-
-                await createSession({ id: user.id, role: user.role, status: user.status });
-                return { success: false, error: "PENDING_APPROVAL", message: "Account pending verification" };
             }
-
-            if (user.status === 'REJECTED') return { success: false, error: "banned", message: "Account suspended or rejected" };
-
-            // Handle Rejected — this branch now unreachable but kept for safety
-            // Re-submission flow is handled above in the PENDING check
         } else {
             // New User flow (Self-registration)
             const role = inputRole || "company";
@@ -124,12 +118,9 @@ export async function sendOTP(phoneInput: string, inputRole?: "company" | "techn
                 };
                 await db.insert(companies).values(compInsert);
             }
-
-            await createSession({ id: newUser.id, role: newUser.role, status: 'PENDING_PROFILE' });
-            return { success: false, error: "PENDING_PROFILE", message: "Account submitted for verification" };
         }
 
-        // Standard OTP trigger for Active users
+        // Standard OTP trigger for ALL users (Active or Pending)
         const otpResult = await createOTP(normalizedPhone);
         if (!otpResult.success) return { success: false, message: otpResult.message };
 
@@ -159,7 +150,6 @@ export async function verifyOTPAction(phoneInput: string, otpInput: string): Pro
 
         await createSession({ id: user.id, role: user.role, status: user.status });
 
-        if (user.status === "PENDING_PROFILE" || user.status === "PENDING_APPROVAL") return { success: false, error: "pending", message: "Account pending verification" };
         if (user.status === "REJECTED") return { success: false, error: "banned", message: "Account suspended or rejected" };
 
         return { success: true, message: "Authentication successful", data: user };

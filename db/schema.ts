@@ -30,6 +30,7 @@ export const users = pgTable("users", {
     name: text("name"),
     passwordHash: varchar("password_hash", { length: 255 }), // bcrypt hash — nullable until password is set
     profileCompleted: boolean("profile_completed").default(false).notNull(),
+    fcmToken: text("fcm_token"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

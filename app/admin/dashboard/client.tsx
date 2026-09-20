@@ -9,6 +9,7 @@ import { Logo } from "@/components/ui/logo"
 import { useEffect, useState } from "react"
 import { useSSE } from "@/hooks/use-sse"
 import { useSliceRefetch } from "@/hooks/use-slice-refetch"
+import { usePushNotifications } from "@/hooks/use-push-notifications"
 import { getAdminStatsAction, getActivityFeedAction } from "@/actions/admin.action"
 
 export function AdminDashboardClient({ initialStats }: { initialStats: any }) {
@@ -19,6 +20,9 @@ export function AdminDashboardClient({ initialStats }: { initialStats: any }) {
 
   const { jobUpdates, attendanceUpdates, notifications, isConnected, fallbackMode } = useSSE(true)
   const { refetch } = useSliceRefetch()
+
+  // Initialize native push notifications
+  usePushNotifications()
 
   useEffect(() => {
     if (!jobUpdates) return

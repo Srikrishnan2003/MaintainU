@@ -337,6 +337,9 @@ export async function failJobAction(jobId: string, reason: string): Promise<Acti
 
 export async function getJobByIdAction(id: string) {
     try {
+        const session = await getSession();
+        if (!session) return { job: null };
+
         const result = await db.select({
             job: jobs,
             req: requests,
@@ -351,6 +354,26 @@ export async function getJobByIdAction(id: string) {
         if (result.length === 0) return { job: null };
 
         const { job, req, comp } = result[0];
+
+        if (session.role === "company") {
+            const companyRec = await db.query.companies.findFirst({ where: eq(companies.userId, session.userId) });
+            if (!companyRec || req.companyId !== companyRec.id) return { job: null };
+        } else if (session.role === "technician") {
+            const tech = await db.query.technicians.findFirst({ where: eq(technicians.userId, session.userId) });
+            if (!tech) return { job: null };
+            
+            let authorized = req.technicianId === tech.id || job.leadTechnicianId === tech.id;
+            
+            if (!authorized) {
+                const teamMember = await db.select().from(masterTeamMembers)
+                    .innerJoin(masterTeams, eq(masterTeamMembers.masterTeamId, masterTeams.id))
+                    .where(and(eq(masterTeams.jobId, job.id), eq(masterTeamMembers.technicianId, tech.id)))
+                    .limit(1);
+                if (teamMember.length > 0) authorized = true;
+            }
+            
+            if (!authorized) return { job: null };
+        }
 
         const activeAttendances = await db.select({ 
                 locationCheckIn: attendance.locationCheckIn,
@@ -379,7 +402,6 @@ export async function getJobByIdAction(id: string) {
 
         let hasActiveSession = false;
         let isLead = false;
-        const session = await getSession();
         if (session && session.role === "technician") {
             const tech = await db.query.technicians.findFirst({ where: eq(technicians.userId, session.userId) });
             if (tech) {

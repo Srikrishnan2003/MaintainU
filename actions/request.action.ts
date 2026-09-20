@@ -1,9 +1,9 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { requests, companies, users, jobs } from "@/db/schema";
+import { requests, companies, users, jobs, technicians, masterTeams, masterTeamMembers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { requireRole } from "@/services/auth.service";
+import { requireRole, getSession } from "@/services/auth.service";
 import { logStatusChange } from "@/services/audit.service";
 import { validateJobTransition } from "@/lib/state-machine";
 import { validateAction, createRequestSchema, reviewRequestSchema, ActionResult } from "@/lib/validations/actions";
@@ -102,6 +102,9 @@ export async function reviewRequestAction(requestId: string, status: any, reason
  */
 export async function getRequestByIdAction(id: string) {
     try {
+        const session = await getSession();
+        if (!session) return { request: null };
+
         const result = await db.select({
             request: requests,
             company: companies,
@@ -114,6 +117,36 @@ export async function getRequestByIdAction(id: string) {
         .limit(1);
 
         if (result.length === 0) return { request: null };
+
+        const req = result[0].request;
+        const job = result[0].job;
+
+        if (session.role === "company") {
+            const comp = await db.query.companies.findFirst({ where: eq(companies.userId, session.userId) });
+            if (!comp || req.companyId !== comp.id) return { request: null };
+        } else if (session.role === "technician") {
+            const tech = await db.query.technicians.findFirst({ where: eq(technicians.userId, session.userId) });
+            if (!tech) return { request: null };
+            
+            // Allow if assigned directly to request
+            let authorized = req.technicianId === tech.id;
+            
+            // Or if they are the lead technician on the job
+            if (!authorized && job && job.leadTechnicianId === tech.id) {
+                authorized = true;
+            }
+            
+            // Or if they are in the master team
+            if (!authorized && job) {
+                const teamMember = await db.select().from(masterTeamMembers)
+                    .innerJoin(masterTeams, eq(masterTeamMembers.masterTeamId, masterTeams.id))
+                    .where(and(eq(masterTeams.jobId, job.id), eq(masterTeamMembers.technicianId, tech.id)))
+                    .limit(1);
+                if (teamMember.length > 0) authorized = true;
+            }
+            
+            if (!authorized) return { request: null };
+        }
 
         return {
             request: {

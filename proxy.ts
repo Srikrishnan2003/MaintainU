@@ -7,14 +7,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-    matcher: [
-        "/admin", "/admin/:path*",
-        "/company", "/company/:path*",
-        "/technician", "/technician/:path*",
-        "/company/login",
-        "/technician/login",
-        "/admin-login",
-        "/onboarding/pending",
-        "/register/:path*"
-    ],
+  matcher: [
+    '/((?!api/sse|_next/static|_next/image|favicon.ico).*)',
+  ],
 };

@@ -219,7 +219,10 @@ export async function getInvoiceByIdAction(invoiceId: string): Promise<ActionRes
 
         if (!invoiceDetail) return { success: false, message: "Invoice not found" };
 
-        // Role enforcement for companies
+        if (session.role === "technician") {
+            return { success: false, message: "Unauthorized" };
+        }
+        
         if (session.role === "company" && invoiceDetail.companyUserId !== session.userId) {
             return { success: false, message: "Unauthorized access to this invoice" };
         }

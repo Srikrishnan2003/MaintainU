@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { technicians, users, jobs, attendance, jobUpdates, technicianScores, requests, companies, dailyAssignments as dailyAssignmentsTable } from "@/db/schema";
+import { technicians, users, jobs, attendance, jobUpdates, technicianScores, requests, companies, dailyAssignments as dailyAssignmentsTable, masterTeams, masterTeamMembers } from "@/db/schema";
 import { eq, and, sql, or, desc } from "drizzle-orm";
 import { requireRole, createSession, getSession } from "@/services/auth.service";
 import { emitAttendanceUpdate } from "@/lib/event-emitter";
@@ -43,11 +43,10 @@ export async function submitTechnicianOnboarding(formData: OnboardingInput) {
         const data = parsed.data;
 
         await db.transaction(async (tx) => {
-            await tx.insert(technicians).values({
-               userId: user.userId,
+            await tx.update(technicians).set({
                ...data,
                status: "Pending",
-            });
+            }).where(eq(technicians.userId, user.userId));
 
             await tx.update(users).set({
                status: "PENDING_APPROVAL",
@@ -183,6 +182,25 @@ export async function postJobUpdateAction(jobId: string, message: string, photos
         const user = await requireRole("technician");
         const tech = await db.query.technicians.findFirst({ where: eq(technicians.userId, user.userId) });
         if (!tech) return { success: false };
+
+        const job = await db.query.jobs.findFirst({ where: eq(jobs.id, jobId) });
+        if (!job) return { success: false, message: "Job not found" };
+
+        let authorized = job.leadTechnicianId === tech.id;
+        if (!authorized) {
+            const req = await db.query.requests.findFirst({ where: eq(requests.id, job.requestId) });
+            if (req && req.technicianId === tech.id) authorized = true;
+        }
+
+        if (!authorized) {
+            const teamMember = await db.select().from(masterTeamMembers)
+                .innerJoin(masterTeams, eq(masterTeamMembers.masterTeamId, masterTeams.id))
+                .where(and(eq(masterTeams.jobId, jobId), eq(masterTeamMembers.technicianId, tech.id)))
+                .limit(1);
+            if (teamMember.length > 0) authorized = true;
+        }
+
+        if (!authorized) return { success: false, message: "Unauthorized" };
 
         await db.insert(jobUpdates).values({
             jobId,

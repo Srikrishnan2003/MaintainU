@@ -35,7 +35,11 @@ const authMiddleware = async ({ req }: { req: Request }) => {
 
 export const ourFileRouter = {
   jobPhoto: f({ image: { maxFileSize: "4MB", maxFileCount: 5 } })
-    .middleware(authMiddleware)
+    .middleware(async (req) => {
+        const metadata = await authMiddleware(req);
+        if (metadata.role !== "technician" && metadata.role !== "admin") throw new UploadThingError("Unauthorized role");
+        return metadata;
+    })
     .onUploadComplete(async ({ metadata, file }) => {
       console.log("Upload complete for userId:", metadata.userId);
       console.log("file url", file.url);
@@ -46,7 +50,11 @@ export const ourFileRouter = {
         image: { maxFileSize: "8MB", maxFileCount: 3 },
         pdf: { maxFileSize: "8MB", maxFileCount: 3 }
     })
-    .middleware(authMiddleware)
+    .middleware(async (req) => {
+        const metadata = await authMiddleware(req);
+        if (metadata.role !== "company" && metadata.role !== "admin") throw new UploadThingError("Unauthorized role");
+        return metadata;
+    })
     .onUploadComplete(async ({ metadata, file }) => {
       console.log("Upload complete for userId:", metadata.userId);
       console.log("file url", file.url);
@@ -56,7 +64,11 @@ export const ourFileRouter = {
   technicianDocs: f({ 
         blob: { maxFileSize: "8MB", maxFileCount: 1 }
     })
-    .middleware(authMiddleware)
+    .middleware(async (req) => {
+        const metadata = await authMiddleware(req);
+        if (metadata.role !== "technician" && metadata.role !== "admin") throw new UploadThingError("Unauthorized role");
+        return metadata;
+    })
     .onUploadComplete(async ({ metadata, file }) => {
       console.log("Upload complete for userId:", metadata.userId);
       console.log("file url", file.url);
