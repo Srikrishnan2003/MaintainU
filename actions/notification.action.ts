@@ -5,6 +5,7 @@ import { notifications, users } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getSession } from "@/services/auth.service";
 import { firebaseAdmin } from "@/lib/firebase-admin";
+import { getMessaging } from "firebase-admin/messaging";
 
 /**
  * Fetches all notifications for the currently logged-in user.
@@ -94,7 +95,7 @@ export async function sendPushNotification(userId: string, title: string, body: 
         const token = userResult[0].fcmToken;
 
         // Send push notification via Firebase Admin
-        const response = await firebaseAdmin.messaging().send({
+        const response = await getMessaging(firebaseAdmin.app()).send({
             token,
             notification: {
                 title,
