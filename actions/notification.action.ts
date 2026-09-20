@@ -95,7 +95,7 @@ export async function sendPushNotification(userId: string, title: string, body: 
         const token = userResult[0].fcmToken;
 
         // Send push notification via Firebase Admin
-        const response = await getMessaging(firebaseAdmin.app()).send({
+        const response = await getMessaging().send({
             token,
             notification: {
                 title,
